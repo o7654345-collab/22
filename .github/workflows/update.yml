@@ -1,0 +1,54 @@
+# ──────────────────────────────────────────────
+# 글로벌 매크로 대시보드 - 자동 빌드 워크플로우
+# ──────────────────────────────────────────────
+# 매일 KST 07:00 (UTC 22:00 전날)에 자동 실행되어
+# 최신 시장 데이터를 수집하고 GitHub Pages로 배포합니다.
+
+name: Update Macro Dashboard
+
+on:
+  # 매일 UTC 22:00 (KST 07:00) 자동 실행
+  schedule:
+    - cron: '0 22 * * *'
+
+  # 수동 실행 버튼 (Actions 탭에서 직접 트리거 가능)
+  workflow_dispatch:
+
+# GitHub Pages 배포 권한
+permissions:
+  contents: write
+  pages: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 저장소 코드 체크아웃
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Python 환경 설정
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 3. 의존성 설치
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # 4. 대시보드 빌드 (실제 데이터 수집 + 변곡점 분석 + HTML 생성)
+      - name: Build dashboard
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python build_dashboard.py
+
+      # 5. GitHub Pages로 배포 (docs/ 폴더)
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          # 커밋 메시지에 날짜 포함
+          commit_message: "📊 Dashboard updated - $(date +'%Y-%m-%d %H:%M UTC')"
