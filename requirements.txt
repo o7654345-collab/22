@@ -1,0 +1,5 @@
+# 글로벌 매크로 대시보드 의존성
+yfinance>=0.2.31       # Yahoo Finance 시장 데이터 수집
+feedparser>=6.0.10     # RSS 뉴스 피드 파싱
+numpy>=1.24            # 목업 데이터 생성 및 수치 연산
+requests>=2.31         # Claude API 호출 (변곡점 원인 분석)
