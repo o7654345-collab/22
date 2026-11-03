@@ -15,40 +15,61 @@ on:
   workflow_dispatch:
 
 # GitHub Pages 배포 권한
+# (Settings → Pages → Source가 "GitHub Actions"인 경우, 공식 배포 액션을 써야 합니다)
 permissions:
-  contents: write
+  contents: read
   pages: write
+  id-token: write
+
+# 동시에 두 배포가 겹치지 않도록
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  # ── 1단계: 대시보드 빌드 ──
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 저장소 코드 체크아웃
+      # 저장소 코드 체크아웃
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Python 환경 설정
+      # Python 환경 설정
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # 3. 의존성 설치
+      # 의존성 설치
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # 4. 대시보드 빌드 (실제 데이터 수집 + 변곡점 분석 + HTML 생성)
+      # 대시보드 빌드 (실제 데이터 수집 + 변곡점 분석 + HTML 생성)
       - name: Build dashboard
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python build_dashboard.py
 
-      # 5. GitHub Pages로 배포 (docs/ 폴더)
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      # GitHub Pages 배포 설정 초기화
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      # 빌드 결과물(docs/)을 Pages 아티팩트로 업로드
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs
-          # 커밋 메시지에 날짜 포함
-          commit_message: "📊 Dashboard updated - $(date +'%Y-%m-%d %H:%M UTC')"
+          path: ./docs
+
+  # ── 2단계: GitHub Pages로 실제 배포 ──
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
