@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>매크로 대시보드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<style>
+/* ═══════════════════════════════════════════
+   디자인 토큰
+   ═══════════════════════════════════════════ */
+:root {
+    color-scheme: light;
+
+    /* 배경 — 화이트 크림 톤 (온기만 살짝 남긴 밝은 오프화이트)
+       더 따뜻하게 하려면 --paper를 #F6F2EA 쪽으로,
+       더 차갑게 하려면 #FBFBF9 쪽으로 조정하면 됩니다. */
+    --paper:        #FAF8F3;
+    --surface:      #FFFFFF;
+    --surface-sunk: #F2EFE8;
+
+    /* 잉크 — UI의 주 색상 (별도 액센트 색 없음), 온기 있는 먹색 */
+    --ink:          #1C1A15;
+    --ink-soft:     #6E6659;
+    --ink-faint:    #A79F90;
+
+    /* 선 */
+    --line:         #EDE8DE;
+    --line-strong:  #DBD4C6;
+
+    /* 의미색 — 등락에만 사용 */
+    --up:           #1F7A4D;
+    --down:         #C03D27;
+    --up-bright:    #86D6A8;
+    --down-bright:  #F5A18C;
+
+    /* 그림자 — 따뜻한 중성 계열로 아주 옅게 */
+    --shadow-sm: 0 1px 2px rgba(82,70,50,0.045);
+    --shadow-md: 0 1px 2px rgba(82,70,50,0.045),
+                 0 14px 30px -18px rgba(82,70,50,0.18);
+
+    --radius:       9px;
+    --radius-lg:    14px;
+
+    --sans: 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* 다크 모드 — 뷰어 설정에 따름 */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --paper:        #15120D;
+        --surface:      #1E1A14;
+        --surface-sunk: #120F0A;
+        --ink:          #F0EADC;
+        --ink-soft:     #A99D88;
+        --ink-faint:    #786C58;
+        --line:         #2E281F;
+        --line-strong:  #41392C;
+        --up:           #6ECB97;
+        --down:         #E8775F;
+        --up-bright:    #6ECB97;
+        --down-bright:  #E8775F;
+        --shadow-sm: 0 1px 2px rgba(0,0,0,0.35);
+        --shadow-md: 0 1px 2px rgba(0,0,0,0.35),
+                     0 12px 28px -16px rgba(0,0,0,0.7);
+    }
+}
+
+/* ═══════════════════════════════════════════
+   기본 리셋
+   ═══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+
+body {
+    font-family: var(--sans);
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+}
+
+button {
+    font-family: inherit;
+    font-size: inherit;
+    border: none;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+}
+
+:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+}
+
+/* ═══════════════════════════════════════════
+   레이아웃
+   ═══════════════════════════════════════════ */
+.shell {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 2.25rem 1.75rem 3.5rem;
+}
+
+/* ── 헤더 ── */
+.masthead {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--line-strong);
+    margin-bottom: 1.5rem;
+}
+
+.masthead h1 {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+}
+
+.masthead .stamp {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── 본문 2단 그리드 ── */
+.workspace {
+    display: grid;
+    grid-template-columns: 268px 1fr;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+/* ═══════════════════════════════════════════
+   좌측: 지표 레일
+   ═══════════════════════════════════════════ */
+.rail {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: 0.5rem;
+    max-height: 616px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+}
+
+.rail::-webkit-scrollbar { width: 6px; }
+.rail::-webkit-scrollbar-track { background: transparent; }
+.rail::-webkit-scrollbar-thumb {
+    background: var(--line-strong);
+    border-radius: 3px;
+}
+
+/* ── 지표 필터 ── */
+.rail-filter {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: var(--surface);
+    padding: 0.25rem 0.25rem 0.5rem;
+}
+
+.rail-filter input {
+    width: 100%;
+    font-family: var(--sans);
+    font-size: 0.8125rem;
+    color: var(--ink);
+    background: var(--surface-sunk);
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    padding: 0.4375rem 0.6875rem;
+    transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.rail-filter input::placeholder { color: var(--ink-faint); }
+
+.rail-filter input:focus {
+    outline: none;
+    background: var(--surface);
+    border-color: var(--line-strong);
+}
+
+.rail-section + .rail-section { margin-top: 0.375rem; }
+
+.rail-section[hidden] { display: none; }
+
+.rail-section-title {
+    position: sticky;
+    top: 2.625rem;
+    z-index: 2;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--ink-faint);
+    background: var(--surface);
+    padding: 0.5rem 0.625rem 0.375rem;
+    letter-spacing: 0.02em;
+}
+
+.rail-row {
+    display: grid;
+    grid-template-columns: 1fr 58px auto;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.625rem;
+    border-radius: var(--radius);
+    text-align: left;
+    transition: background 0.14s ease, color 0.14s ease;
+}
+
+.rail-row[hidden] { display: none; }
+
+.rail-row:hover { background: var(--surface-sunk); }
+
+.rail-row.is-selected {
+    background: var(--ink);
+    color: var(--paper);
+}
+
+.rail-name {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.rail-spark {
+    width: 58px;
+    height: 18px;
+    overflow: visible;
+    opacity: 0.55;
+    transition: opacity 0.14s ease;
+}
+
+.rail-row:hover .rail-spark { opacity: 0.9; }
+
+.rail-spark path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+}
+
+.rail-row.is-selected .rail-spark {
+    opacity: 0.85;
+    color: var(--paper) !important;
+}
+
+.rail-figures {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.3;
+}
+
+.rail-value {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+.rail-change {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.rail-change.up   { color: var(--up); }
+.rail-change.down { color: var(--down); }
+
+/* 선택된 행에서는 등락색을 밝게 보정 */
+.rail-row.is-selected .rail-change.up   { color: var(--up-bright); }
+.rail-row.is-selected .rail-change.down { color: var(--down-bright); }
+
+/* ═══════════════════════════════════════════
+   우측: 차트 패널
+   ═══════════════════════════════════════════ */
+.panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: 1.5rem 1.625rem 1.375rem;
+}
+
+/* ── 선택 지표 수치 리드아웃 ── */
+.readout {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+
+.readout-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4375rem;
+    font-size: 0.8125rem;
+    color: var(--ink-soft);
+    margin-bottom: 0.3125rem;
+}
+
+/* 지표 색상 점 */
+.readout-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.readout-cat {
+    font-size: 0.6875rem;
+    color: var(--ink-faint);
+    padding: 0.0625rem 0.375rem;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+}
+
+.readout-figure {
+    display: flex;
+    align-items: baseline;
+    gap: 0.625rem;
+}
+
+.readout-value {
+    font-family: var(--mono);
+    font-size: 2rem;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+
+.readout-change {
+    font-family: var(--mono);
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+.readout-change.up   { color: var(--up); }
+.readout-change.down { color: var(--down); }
+
+/* ── 기간 전환 ── */
+.period {
+    display: inline-flex;
+    background: var(--surface-sunk);
+    border-radius: var(--radius);
+    padding: 2px;
+    gap: 2px;
+}
+
+.period-btn {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--ink-soft);
+    padding: 0.375rem 0.875rem;
+    border-radius: 6px;
+    transition: all 0.12s ease;
+}
+
+.period-btn:hover:not(.is-active) { color: var(--ink); }
+
+.period-btn.is-active {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+/* ── 차트 캔버스 ── */
+.canvas-wrap {
+    position: relative;
+    height: 320px;
+}
+
+/* ═══════════════════════════════════════════
+   변곡점 분석 목록
+   ═══════════════════════════════════════════ */
+.inflections {
+    margin-top: 1.25rem;
+    padding-top: 1.125rem;
+    border-top: 1px solid var(--line);
+}
+
+.inflections-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin-bottom: 0.625rem;
+}
+
+.inflection-row {
+    display: grid;
+    grid-template-columns: 5.5rem 4.25rem 1fr;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.5rem 0.5rem;
+    margin: 0 -0.5rem;
+    border-radius: 6px;
+    border-bottom: 1px solid var(--line);
+    transition: background 0.12s ease;
+}
+
+.inflection-row:hover { background: var(--surface-sunk); }
+
+.inflection-row:last-child { border-bottom: none; }
+
+.inflection-date {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+.inflection-pct {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.inflection-pct.up   { color: var(--up); }
+.inflection-pct.down { color: var(--down); }
+
+.inflection-reason {
+    font-size: 0.8125rem;
+    color: var(--ink);
+}
+
+.inflection-reason.pending {
+    color: var(--ink-faint);
+    font-style: italic;
+}
+
+/* ═══════════════════════════════════════════
+   뉴스
+   ═══════════════════════════════════════════ */
+.headlines {
+    margin-top: 2rem;
+}
+
+.headlines-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--line-strong);
+    margin-bottom: 1.125rem;
+}
+
+.headlines-bar h2 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+/* ── 카테고리 탭 (밑줄 슬라이드) ── */
+.news-tabs {
+    display: flex;
+    gap: 0.25rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin-bottom: -0.75rem;
+}
+
+.news-tabs::-webkit-scrollbar { display: none; }
+
+.news-tab {
+    position: relative;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--ink-faint);
+    padding: 0.375rem 0.75rem 0.75rem;
+    white-space: nowrap;
+    transition: color 0.14s ease;
+}
+
+.news-tab:hover { color: var(--ink-soft); }
+
+.news-tab.is-active {
+    color: var(--ink);
+    font-weight: 600;
+}
+
+/* 활성 탭 아래 잉크 밑줄 */
+.news-tab::after {
+    content: '';
+    position: absolute;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: -1px;
+    height: 2px;
+    background: var(--ink);
+    border-radius: 1px;
+    transform: scaleX(0);
+    transition: transform 0.18s ease;
+}
+
+.news-tab.is-active::after { transform: scaleX(1); }
+
+/* ── 뉴스 카드 ── */
+.news-panel[hidden] { display: none; }
+
+.news-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.875rem;
+}
+
+.news-card {
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: 1.125rem 1.25rem 1.25rem;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.news-card:hover {
+    border-color: var(--line-strong);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.news-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 0.625rem;
+}
+
+.news-source {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+    white-space: nowrap;
+}
+
+.news-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.42;
+    letter-spacing: -0.012em;
+    margin-bottom: 0.5rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.news-summary {
+    font-size: 0.8125rem;
+    color: var(--ink-soft);
+    line-height: 1.55;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.news-date {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.news-empty {
+    font-size: 0.8125rem;
+    color: var(--ink-faint);
+    padding: 1.5rem 0;
+}
+
+/* ── 푸터 ── */
+.colophon {
+    margin-top: 2.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+    font-size: 0.6875rem;
+    color: var(--ink-faint);
+    text-align: center;
+}
+
+/* ═══════════════════════════════════════════
+   반응형
+   ═══════════════════════════════════════════ */
+@media (max-width: 920px) {
+    .workspace { grid-template-columns: 1fr; }
+    .rail { max-height: 232px; }
+    .news-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+    .shell { padding: 1.5rem 1rem 2.5rem; }
+    .masthead { flex-direction: column; gap: 0.25rem; align-items: flex-start; }
+    .panel { padding: 1.125rem 1rem 1rem; }
+    .readout-value { font-size: 1.625rem; }
+    .canvas-wrap { height: 260px; }
+    .inflection-row { grid-template-columns: 4.75rem 3.75rem 1fr; gap: 0.5rem; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+    <!-- ══ 헤더 ══ -->
+    <header class="masthead">
+        <h1>매크로 대시보드</h1>
+        <span class="stamp">2026-11-03 05:19 KST</span>
+    </header>
+
+    <!-- ══ 본문 ══ -->
+    <div class="workspace">
+
+        <!-- 좌측: 지표 목록 -->
+        <nav class="rail" aria-label="지표 선택">
+            <div class="rail-filter">
+                <input type="search" id="rail-search" placeholder="지표 검색" aria-label="지표 검색">
+            </div>
+            <div class="rail-section"><div class="rail-section-title">증시</div>
+            <button class="rail-row is-selected" data-name="KOSPI">
+                <span class="rail-name">KOSPI</span>
+                <svg class="rail-spark" data-spark="KOSPI" viewBox="0 0 64 20" preserveAspectRatio="none"></svg>
+                <span class="rail-figures">
+                    <span class="rail-value">5,859</span>
+                    <span class="rail-change up">+2.24%</span>
+                </span>
+            </button>
+            <button class="rail-row" data-name="KOSDAQ">
+                <span class="rail-name">KOSDAQ</span>
+                <svg class="rail-spark" data-spark="KOSDAQ" viewBox="0 0 64 20" preserveAspectRatio="none"></svg>
+                <span class="rail-figures">
+                    <span class="rail-value">734</span>
+                    <span class="rail-change up">+1.38%</span>
+                </span>
+            </button>
+            <button class="rail-row" data-name="DOW">
+                <span class="rail-name">DOW</span>
+                <svg class="rail-spark" data-spark="DOW" viewBox="0 0 64 20" preserveAspectRatio="none"></svg>
+                <span class="rail-figures">
+                    <span class="rail-value">51,984</span>
+                    <span class="rail-change up">+0.41%</span>
+                </span>
+            </button>
+            <button class="rail-row" data-name="NASDAQ">
+                <span class="rail-name">NASDAQ</span>
+                <svg class="rail-spark" data-spark="NASDAQ" viewBox="0 0 64 20" preserveAspectRatio="none"></svg>
+                <span class="rail-figures">
+                    <span class="rail-value">25,164</span>
+                    <span class="rail-change down">-1.07%</span>
+                </span>
+            </button>
+            <button class="rail-row" data-name="상해종합">
+                <span class="rail-name">상해종합</span>
+                <svg class="rail-spark" data-spark="상해종합" viewBox="0 0 64 20" preserveAspectRatio="none"></svg>
+                <span class="rail-figures">
+                    <span class="rail-value">3,638</span>
+                    <span class="rail-change up">+1.08%</span>
+                </span>
+            </button>
+            <button class="rail-row" data-name="NIKKEI">
+                <span class="rail-name">NIKKEI</span>
+                <svg class="rail-spark" data-spark="NIKKEI" viewBox="0 0 64 20" preserveAspectRatio="none"></svg>
+                <span class="rail-figures">
+                    <span class="rail-value">63,082</span>
+                    <span class="rail-change down">-0.33%</span>
+                </span>
+            </button></div>
+<div class="rail-section"><div class="rail-section-title">환율</div>
+            <button class="rail-row" data-name="USD/KRW">
+                <span class="rail-name">USD/KRW</span>
+                <svg class="rail-spark" data-spark="USD/KRW" viewBox="0 0 64 20" preserveAspectRatio="none"></svg>
+                <span class="rail-figures">
+                    <span class="rail-value">1,339</span>
+                    <span class="rail-change up">+1.03%</span>
+                </span>
+            </button>
+            <button class="rail-row" data-name="EUR/KRW">
+                <span class="rail-name">EUR/KRW</span>
+                <svg class="rail-spark" data-spark="EUR/KRW" viewBox="0 0 64 20" preserveAspectRatio="none"></svg>
+                <span class="rail-figures">
+                    <span class="rail-value">1,498</span>
+                    <span class="rail-change up">+0.79%</span>
+                </span>
+            </button>
+            <button class="rail-row" data-name="JPY100/KRW">
+                <span class="rail-name">JPY100/KRW</span>
+                <svg class="rail-spark" data-spark="JPY100/KRW" viewBox="0 0 64 20" preserveAspectRatio="none"></svg>
+                <span class="rail-figures">
+                    <span class="rail-value">846</span>
+                    <span class="rail-change up">+0.12%</span>
+                </span>
+            </button></div>
+<div class="rail-section"><div class="rail-section-title">기타</div>
+            <button class="rail-row" data-name="US10Y">
+                <span class="rail-name">US10Y</span>
+                <svg class="rail-spark" data-spark="US10Y" viewBox="0 0 64 20" preserveAspectRatio="none"></svg>
+                <span class="rail-figures">
+                    <span class="rail-value">4.89</span>
+                    <span class="rail-change down">-0.71%</span>
+                </span>
+            </button></div>
+
+        </nav>
+
+        <!-- 우측: 차트 -->
+        <section class="panel">
+            <div class="readout">
+                <div>
+                    <div class="readout-label">
+                        <span class="readout-dot" id="ro-dot"></span>
+                        <span id="ro-label"></span>
+                        <span class="readout-cat" id="ro-cat"></span>
+                    </div>
+                    <div class="readout-figure">
+                        <span class="readout-value" id="ro-value"></span>
+                        <span class="readout-change" id="ro-change"></span>
+                    </div>
+                </div>
+                <div class="period" role="group" aria-label="기간">
+                    <button class="period-btn is-active" data-period="daily">일별</button>
+                    <button class="period-btn" data-period="weekly">주별</button>
+                    <button class="period-btn" data-period="monthly">월별</button>
+                </div>
+            </div>
+
+            <div class="canvas-wrap">
+                <canvas id="chart"></canvas>
+            </div>
+
+            <div class="inflections">
+                <div class="inflections-title">주요 변곡점</div>
+                <div id="inflection-list"></div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- ══ 뉴스 ══ -->
+    <section class="headlines">
+        <div class="headlines-bar">
+            <h2>오늘의 헤드라인</h2>
+            <div class="news-tabs" role="tablist">
+                <button class="news-tab is-active" data-cat="cat-0" role="tab" aria-selected="true">국제</button><button class="news-tab" data-cat="cat-1" role="tab" aria-selected="false">경제</button><button class="news-tab" data-cat="cat-2" role="tab" aria-selected="false">테크</button><button class="news-tab" data-cat="cat-3" role="tab" aria-selected="false">스포츠</button><button class="news-tab" data-cat="cat-4" role="tab" aria-selected="false">연예</button>
+            </div>
+        </div>
+        <div class="news-panel" id="cat-0" role="tabpanel"><div class="news-grid">
+            <a class="news-card" href="https://www.bbc.co.uk/news/articles/cx240mrm3g8vo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+                <div class="news-meta">
+                    <span class="news-source">BBC</span>
+                    <time class="news-date">2026-11-03 03:39</time>
+                </div>
+                <h3 class="news-title">US strikes Iran ahead of midterm elections</h3>
+                <p class="news-summary">US officials described the attacks on Qeshm Island as limited and defensive, according to CBS, the BBC's US partner.</p>
+            </a>
+            <a class="news-card" href="https://www.bbc.co.uk/news/articles/cm5ynekkn5qko?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+                <div class="news-meta">
+                    <span class="news-source">BBC</span>
+                    <time class="news-date">2026-11-03 03:32</time>
+                </div>
+                <h3 class="news-title">Supreme Court rejects Trump's request to stop California counting disputed votes</h3>
+                <p class="news-summary">The ruling, which comes on the eve of the midterm elections, essentially ends the Trump administration's bid to disqualify the ballots in the state.</p>
+            </a>
+            <a class="news-card" href="https://www.bbc.co.uk/news/articles/cjy56dndlyz0o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+                <div class="news-meta">
+                    <span class="news-source">BBC</span>
+                    <time class="news-date">2026-11-03 01:56</time>
+                </div>
+                <h3 class="news-title">Russian bombing kills 26 people at Ukraine aid centre, Kyiv says</h3>
+                <p class="news-summary">Officials say at least nine 3,000kg aerial bombs hit a southern Ukrainian village in what the president called an "utterly horrific" attack.</p>
+            </a></div></div><div class="news-panel" id="cat-1" role="tabpanel" hidden><div class="news-grid">
+            <a class="news-card" href="https://www.bbc.co.uk/news/articles/cmp3grwre9xdo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+                <div class="news-meta">
+                    <span class="news-source">BBC</span>
+                    <time class="news-date">2026-11-03 02:11</time>
+                </div>
+                <h3 class="news-title">UK and EU agree draft deal to scrap Brexit red tape over food exports</h3>
+                <p class="news-summary">The food deal, ahead of a UK-EU summit later this month, is the most significant part of the so-called Brexit reset agreed so far.</p>
+            </a>
+            <a class="news-card" href="https://www.bbc.co.uk/news/articles/c6rey4v53exgo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+                <div class="news-meta">
+                    <span class="news-source">BBC</span>
+                    <time class="news-date">2026-11-03 01:23</time>
+                </div>
+                <h3 class="news-title">North Korea denies being behind record $6.3bn Binance hack</h3>
+                <p class="news-summary">US government agencies and cyber analysts have blamed Pyongyang for the record-breaking heist.</p>
+            </a>
+            <a class="news-card" href="https://www.bbc.co.uk/news/articles/c6n8dn457ypko?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+                <div class="news-meta">
+                    <span class="news-source">BBC</span>
+                    <time class="news-date">2026-11-03 00:29</time>
+                </div>
+                <h3 class="news-title">Apple unsure when more foldable iPhones will be available after selling out</h3>
+                <p class="news-summary">Apple’s foldable iPhone Duo was a hit with people willing to spend $2,000 on a new mobile.</p>
+            </a></div></div><div class="news-panel" id="cat-2" role="tabpanel" hidden><div class="news-grid">
+            <a class="news-card" href="https://www.bbc.co.uk/news/articles/c6rey4v53exgo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+                <div class="news-meta">
+                    <span class="news-source">BBC</span>
+                    <time class="news-date">2026-11-03 01:23</time>
+                </div>
+                <h3 class="news-title">North Korea denies being behind record $6.3bn Binance hack</h3>
+                <p class="news-summary">US government agencies and cyber analysts have blamed Pyongyang for the record-breaking heist.</p>
+            </a>
+            <a class="news-card" href="https://www.bbc.co.uk/news/articles/c6n8dn457ypko?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+                <div class="news-meta">
+                    <span class="news-source">BBC</span>
+                    <time class="news-date">2026-11-03 00:29</time>
+                </div>
+                <h3 class="news-title">Apple unsure when more foldable iPhones will be available after selling out</h3>
+                <p class="news-summary">Apple’s foldable iPhone Duo was a hit with people willing to spend $2,000 on a new mobile.</p>
+            </a>
+            <a class="news-card" href="https://www.nytimes.com/2026/11/02/technology/apple-earnings.html" target="_blank" rel="noopener">
+                <div class="news-meta">
+                    <span class="news-source">New York Times</span>
+                    <time class="news-date">2026-11-02 23:41</time>
+                </div>
+                <h3 class="news-title">Apple’s Profit Grows 12% Despite Component Price Worries</h3>
+                <p class="news-summary">The company said iPhone sales remained strong, but warned that the cost of memory chips for its devices was going up.</p>
+            </a></div></div><div class="news-panel" id="cat-3" role="tabpanel" hidden><div class="news-grid">
+            <a class="news-card" href="https://www.bbc.co.uk/sport/horse-racing/articles/cr3wv0476z5do?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+                <div class="news-meta">
+                    <span class="news-source">BBC Sport</span>
+                    <time class="news-date">2026-11-03 05:15</time>
+                </div>
+                <h3 class="news-title">King's former horse wins prestigious Melbourne Cup</h3>
+                <p class="news-summary">Point of Law ridden by Ethan Brown has won Australia's "race that stops a nation".</p>
+            </a>
+            <a class="news-card" href="https://www.theguardian.com/sport/2026/nov/02/bears-seahawks-caleb-williams-jeffery-simmons-monday-night-football" target="_blank" rel="noopener">
+                <div class="news-meta">
+                    <span class="news-source">The Guardian</span>
+                    <time class="news-date">2026-11-03 04:55</time>
+                </div>
+                <h3 class="news-title">Caleb Williams and new arrival Jeffery Simmons power Bears past sputtering Seahawks</h3>
+                <p class="news-summary">Star defensive lineman has one sack, six tacklesD’Andre Swift rushes for three touchdownsSeattle have lost three of their last four gamesCaleb Williams threw a touchdown pass on the opening drive and Jeffery Simmons deli</p>
+            </a>
+            <a class="news-card" href="https://www.bbc.co.uk/sport/football/articles/cmly05n114gjo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+                <div class="news-meta">
+                    <span class="news-source">BBC Sport</span>
+                    <time class="news-date">2026-11-02 23:53</time>
+                </div>
+                <h3 class="news-title">Jeers again as home woes continue - Jaissle has big problems at Newcastle</h3>
+                <p class="news-summary">Three months into a four-year contract, the problems are mounting for Newcastle boss Matthias Jaissle after his side were booed off the pitch by their own fans following another defeat.</p>
+            </a></div></div><div class="news-panel" id="cat-4" role="tabpanel" hidden><div class="news-grid">
+            <a class="news-card" href="https://www.bbc.co.uk/news/articles/cve8rp085zzjo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+                <div class="news-meta">
+                    <span class="news-source">BBC</span>
+                    <time class="news-date">2026-11-03 01:52</time>
+                </div>
+                <h3 class="news-title">'Mogging' is Collins' word of the year... but do you know what it means?</h3>
+                <p class="news-summary">The slang term, which relates to outshining or upstaging someone, is one of 10 words celebrated.</p>
+            </a>
+            <a class="news-card" href="https://www.bbc.co.uk/news/videos/cmvg9w5w2p1no?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+                <div class="news-meta">
+                    <span class="news-source">BBC</span>
+                    <time class="news-date">2026-11-03 00:09</time>
+                </div>
+                <h3 class="news-title">Bollywood film star Ranbir Kapoor on AI, movies and fatherhood</h3>
+                <p class="news-summary">The film star plays the leading role in a major new adaptation of the Indian epic Ramayana.</p>
+            </a>
+            <a class="news-card" href="https://www.nytimes.com/2026/11/02/theater/odets-waiting-for-lefty-awake-sing-golden-boy.html" target="_blank" rel="noopener">
+                <div class="news-meta">
+                    <span class="news-source">New York Times</span>
+                    <time class="news-date">2026-11-02 21:19</time>
+                </div>
+                <h3 class="news-title">Why Is Clifford Odets Having His Best Year Since 1935?</h3>
+                <p class="news-summary">The playwright of hard-talking works like “Waiting for Lefty” and “Awake and Sing!” is again the man of the moment.</p>
+            </a></div></div>
+    </section>
+
+    <footer class="colophon">
+        시장 데이터 Yahoo Finance · 변곡점 분석 Claude · GitHub Actions 자동 빌드
+    </footer>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   임베디드 데이터
+   ═══════════════════════════════════════════ */
+const DATA = {"KOSPI": {"group": "증시", "color": "#2F43A6", "daily": {"2025-11-03": 4221.8701, "2025-11-04": 4121.7402, "2025-11-05": 4004.4199, "2025-11-06": 4026.45, "2025-11-07": 3953.76, "2025-11-10": 4073.24, "2025-11-11": 4106.3901, "2025-11-12": 4150.3901, "2025-11-13": 4170.6299, "2025-11-14": 4011.5701, "2025-11-17": 4089.25, "2025-11-18": 3953.6201, "2025-11-19": 3929.51, "2025-11-20": 4004.8501, "2025-11-21": 3853.26, "2025-11-24": 3846.0601, "2025-11-25": 3857.78, "2025-11-26": 3960.8701, "2025-11-27": 3986.9099, "2025-11-28": 3926.5901, "2025-12-01": 3920.3701, "2025-12-02": 3994.9299, "2025-12-03": 4036.3, "2025-12-04": 4028.51, "2025-12-05": 4100.0498, "2025-12-08": 4154.8501, "2025-12-09": 4143.5498, "2025-12-10": 4135.0, "2025-12-11": 4110.6201, "2025-12-12": 4167.1602, "2025-12-15": 4090.5901, "2025-12-16": 3999.1299, "2025-12-17": 4056.4099, "2025-12-18": 3994.51, "2025-12-19": 4020.55, "2025-12-22": 4105.9302, "2025-12-23": 4117.3198, "2025-12-24": 4108.6201, "2025-12-26": 4129.6802, "2025-12-29": 4220.5601, "2025-12-30": 4214.1699, "2026-01-02": 4309.6299, "2026-01-05": 4457.52, "2026-01-06": 4525.48, "2026-01-07": 4551.0601, "2026-01-08": 4552.3701, "2026-01-09": 4586.3198, "2026-01-12": 4624.79, "2026-01-13": 4692.6401, "2026-01-14": 4723.1001, "2026-01-15": 4797.5498, "2026-01-16": 4840.7402, "2026-01-19": 4904.6602, "2026-01-20": 4885.75, "2026-01-21": 4909.9302, "2026-01-22": 4952.5298, "2026-01-23": 4990.0698, "2026-01-26": 4949.5898, "2026-01-27": 5084.8501, "2026-01-28": 5170.8101, "2026-01-29": 5221.25, "2026-01-30": 5224.3599, "2026-02-02": 4949.6699, "2026-02-03": 5288.0801, "2026-02-04": 5371.1001, "2026-02-05": 5163.5698, "2026-02-06": 5089.1401, "2026-02-09": 5298.04, "2026-02-10": 5301.6899, "2026-02-11": 5354.4902, "2026-02-12": 5522.27, "2026-02-13": 5507.0098, "2026-02-19": 5677.25, "2026-02-20": 5808.5298, "2026-02-23": 5846.0898, "2026-02-24": 5969.6401, "2026-02-25": 6083.8599, "2026-02-26": 6307.27, "2026-02-27": 6244.1299, "2026-03-03": 5791.9102, "2026-03-04": 5093.54, "2026-03-05": 5583.8999, "2026-03-06": 5584.8701, "2026-03-09": 5251.8701, "2026-03-10": 5532.5898, "2026-03-11": 5609.9502, "2026-03-12": 5583.25, "2026-03-13": 5487.2402, "2026-03-16": 5549.8501, "2026-03-17": 5640.48, "2026-03-18": 5925.0298, "2026-03-19": 5763.2202, "2026-03-20": 5781.2002, "2026-03-23": 5405.75, "2026-03-24": 5553.9199, "2026-03-25": 5642.21, "2026-03-26": 5460.46, "2026-03-27": 5438.8701, "2026-03-30": 5277.2998, "2026-03-31": 5052.46, "2026-04-01": 5478.7002, "2026-04-02": 5234.0498, "2026-04-03": 5377.2998, "2026-04-06": 5450.3301, "2026-04-07": 5494.7798, "2026-04-08": 5872.3398, "2026-04-09": 5778.0098, "2026-04-10": 5858.8701, "2026-04-13": 5808.6201, "2026-04-14": 5967.75, "2026-04-15": 6091.3901, "2026-04-16": 6226.0498, "2026-04-17": 6191.9199, "2026-04-20": 6219.0898, "2026-04-21": 6388.4702, "2026-04-22": 6417.9302, "2026-04-23": 6475.8101, "2026-04-24": 6475.6299, "2026-04-27": 6615.0298, "2026-04-28": 6641.02, "2026-04-29": 6690.8999, "2026-04-30": 6598.8701, "2026-05-04": 6936.9902, "2026-05-06": 7384.5601, "2026-05-07": 7490.0498, "2026-05-08": 7498.0, "2026-05-11": 7822.2402, "2026-05-12": 7643.1499, "2026-05-13": 7844.0098, "2026-05-14": 7981.4102, "2026-05-15": 7493.1802, "2026-05-18": 7516.04, "2026-05-19": 7271.6602, "2026-05-20": 7208.9502, "2026-05-21": 7815.5898, "2026-05-22": 7847.71, "2026-05-26": 8047.5098, "2026-05-27": 8228.7002, "2026-05-28": 8185.29, "2026-05-29": 8476.1504, "2026-06-01": 8788.3799, "2026-06-02": 8801.4902, "2026-06-04": 8639.4102, "2026-06-05": 8160.5898, "2026-06-08": 7484.4102, "2026-06-09": 8096.9302, "2026-06-10": 7730.8198, "2026-06-11": 7763.9502, "2026-06-12": 8123.6201, "2026-06-15": 8545.9805, "2026-06-16": 8726.5996, "2026-06-17": 8864.2402, "2026-06-18": 9063.8398, "2026-06-19": 9052.4199, "2026-06-22": 9114.5498, "2026-06-23": 8203.8398, "2026-06-24": 8471.0195, "2026-06-25": 8930.2998, "2026-06-26": 8411.21, "2026-06-29": 8394.6504, "2026-06-30": 8476.4805, "2026-07-01": 8303.4102, "2026-07-02": 7648.0898, "2026-07-03": 8088.3398, "2026-07-06": 8051.3301, "2026-07-07": 7656.3101, "2026-07-08": 7246.79, "2026-07-09": 7291.9102, "2026-07-10": 7475.9399, "2026-07-13": 6806.9302, "2026-07-14": 6856.8301, "2026-07-15": 7284.4102, "2026-07-16": 6820.6001, "2026-07-20": 6516.27, "2026-07-21": 6747.9502, "2026-07-22": 6797.7002, "2026-07-23": 7096.8901, "2026-07-24": 6690.6201, "2026-07-27": 6755.75, "2026-07-28": 6023.6602, "2026-07-29": 5663.2402, "2026-07-30": 5593.5601, "2026-07-31": 6595.4502, "2026-08-03": 6257.4502, "2026-08-04": 6358.9502, "2026-08-05": 6598.2598, "2026-08-06": 6296.3799, "2026-08-07": 6258.77, "2026-08-10": 6299.6602, "2026-08-11": 6345.5298, "2026-08-12": 6579.04, "2026-08-13": 6813.3398, "2026-08-14": 6977.9399, "2026-08-18": 6869.8301, "2026-08-19": 6471.1699, "2026-08-20": 6852.5801, "2026-08-21": 6912.9502, "2026-08-24": 6696.96, "2026-08-25": 6742.7402, "2026-08-26": 6808.21, "2026-08-27": 6912.3701, "2026-08-28": 6788.8799, "2026-08-31": 6820.02, "2026-09-01": 6835.7998, "2026-09-02": 6562.7202, "2026-09-03": 6579.48, "2026-09-04": 6687.21, "2026-09-07": 6995.3901, "2026-09-08": 6954.52, "2026-09-09": 7051.6401, "2026-09-10": 7033.9199, "2026-09-11": 6909.9102, "2026-09-14": 6684.3701, "2026-09-15": 6627.2598, "2026-09-16": 6717.9702, "2026-09-17": 6715.4102, "2026-09-18": 6894.23, "2026-09-21": 7007.7202, "2026-09-22": 7017.9102, "2026-09-23": 7080.9199, "2026-09-28": 6889.7402, "2026-09-29": 6870.8101, "2026-09-30": 6838.04, "2026-10-01": 6971.3501, "2026-10-02": 7003.7402, "2026-10-06": 6941.3901, "2026-10-07": 6803.8999, "2026-10-08": 6625.9302, "2026-10-12": 6384.2402, "2026-10-13": 6035.3501, "2026-10-14": 6008.8101, "2026-10-15": 5554.2202, "2026-10-16": 5668.0498, "2026-10-19": 5768.0098, "2026-10-20": 5552.7402, "2026-10-21": 5735.6602, "2026-10-22": 5533.77, "2026-10-23": 5550.2998, "2026-10-26": 5469.4702, "2026-10-27": 5638.3398, "2026-10-28": 6012.4399, "2026-10-29": 5937.6602, "2026-10-30": 5730.7402, "2026-11-02": 5859.0801}, "weekly": {"2025-11-03": 3953.76, "2025-11-10": 4011.5701, "2025-11-17": 3853.26, "2025-11-24": 3926.5901, "2025-12-01": 4100.0498, "2025-12-08": 4167.1602, "2025-12-15": 4020.55, "2025-12-22": 4129.6802, "2025-12-29": 4309.6299, "2026-01-05": 4586.3198, "2026-01-12": 4840.7402, "2026-01-19": 4990.0698, "2026-01-26": 5224.3599, "2026-02-02": 5089.1401, "2026-02-09": 5507.0098, "2026-02-16": 5808.5298, "2026-02-23": 6244.1299, "2026-03-02": 5584.8701, "2026-03-09": 5487.2402, "2026-03-16": 5781.2002, "2026-03-23": 5438.8701, "2026-03-30": 5377.2998, "2026-04-06": 5858.8701, "2026-04-13": 6191.9199, "2026-04-20": 6475.6299, "2026-04-27": 6598.8701, "2026-05-04": 7498.0, "2026-05-11": 7493.1802, "2026-05-18": 7847.71, "2026-05-25": 8476.1504, "2026-06-01": 8160.5898, "2026-06-08": 8123.6201, "2026-06-15": 9052.4199, "2026-06-22": 8411.21, "2026-06-29": 8088.3398, "2026-07-06": 7475.9399, "2026-07-13": 6820.6001, "2026-07-20": 6690.6201, "2026-07-27": 6595.4502, "2026-08-03": 6258.77, "2026-08-10": 6977.9399, "2026-08-17": 6912.9502, "2026-08-24": 6788.8799, "2026-08-31": 6687.21, "2026-09-07": 6909.9102, "2026-09-14": 6894.23, "2026-09-21": 7080.9199, "2026-09-28": 7003.7402, "2026-10-05": 6625.9302, "2026-10-12": 5668.0498, "2026-10-19": 5550.2998, "2026-10-26": 5730.7402, "2026-11-02": 5859.0801}, "monthly": {"2025-11-01": 3926.5901, "2025-12-01": 4214.1699, "2026-01-01": 5224.3599, "2026-02-01": 6244.1299, "2026-03-01": 5052.46, "2026-04-01": 6598.8701, "2026-05-01": 8476.1504, "2026-06-01": 8476.4805, "2026-07-01": 6595.4502, "2026-08-01": 6820.02, "2026-09-01": 6838.04, "2026-10-01": 5730.7402, "2026-11-01": 5859.0801}, "inflections": [{"date": "2026-07-31", "value": 6595.4502, "change_pct": 17.91}, {"date": "2026-03-04", "value": 5093.54, "change_pct": -12.06}, {"date": "2026-07-28", "value": 6023.6602, "change_pct": -10.84}, {"date": "2026-06-23", "value": 8203.8398, "change_pct": -9.99}, {"date": "2026-03-05", "value": 5583.8999, "change_pct": 9.63}]}, "KOSDAQ": {"group": "증시", "color": "#117A6B", "daily": {"2025-11-03": 914.55, "2025-11-04": 926.57, "2025-11-05": 901.89, "2025-11-06": 898.17, "2025-11-07": 876.81, "2025-11-10": 888.35, "2025-11-11": 884.27, "2025-11-12": 906.51, "2025-11-13": 918.37, "2025-11-14": 897.9, "2025-11-17": 902.67, "2025-11-18": 878.7, "2025-11-19": 871.32, "2025-11-20": 891.94, "2025-11-21": 863.95, "2025-11-24": 856.44, "2025-11-25": 856.03, "2025-11-26": 877.32, "2025-11-27": 880.06, "2025-11-28": 912.67, "2025-12-01": 922.38, "2025-12-02": 928.42, "2025-12-03": 932.01, "2025-12-04": 929.83, "2025-12-05": 924.74, "2025-12-08": 927.79, "2025-12-09": 931.35, "2025-12-10": 935.0, "2025-12-11": 934.64, "2025-12-12": 937.34, "2025-12-15": 938.83, "2025-12-16": 916.11, "2025-12-17": 911.07, "2025-12-18": 901.33, "2025-12-19": 915.27, "2025-12-22": 929.14, "2025-12-23": 919.56, "2025-12-24": 915.2, "2025-12-26": 919.67, "2025-12-29": 932.59, "2025-12-30": 925.47, "2026-01-02": 945.57, "2026-01-05": 957.5, "2026-01-06": 955.97, "2026-01-07": 947.39, "2026-01-08": 944.06, "2026-01-09": 947.92, "2026-01-12": 949.81, "2026-01-13": 948.98, "2026-01-14": 942.18, "2026-01-15": 951.16, "2026-01-16": 954.59, "2026-01-19": 968.36, "2026-01-20": 976.37, "2026-01-21": 951.29, "2026-01-22": 970.35, "2026-01-23": 993.93, "2026-01-26": 1064.41, "2026-01-27": 1082.59, "2026-01-28": 1133.52, "2026-01-29": 1164.41, "2026-01-30": 1149.4399, "2026-02-02": 1098.36, "2026-02-03": 1144.33, "2026-02-04": 1149.4301, "2026-02-05": 1108.41, "2026-02-06": 1080.77, "2026-02-09": 1127.55, "2026-02-10": 1115.2, "2026-02-11": 1114.87, "2026-02-12": 1125.99, "2026-02-13": 1106.08, "2026-02-19": 1160.71, "2026-02-20": 1154.0, "2026-02-23": 1151.99, "2026-02-24": 1165.0, "2026-02-25": 1165.25, "2026-02-26": 1188.15, "2026-02-27": 1192.78, "2026-03-03": 1137.7, "2026-03-04": 978.44, "2026-03-05": 1116.41, "2026-03-06": 1154.67, "2026-03-09": 1102.28, "2026-03-10": 1137.6801, "2026-03-11": 1136.83, "2026-03-12": 1148.4, "2026-03-13": 1152.96, "2026-03-16": 1138.29, "2026-03-17": 1136.9399, "2026-03-18": 1164.38, "2026-03-19": 1143.48, "2026-03-20": 1161.52, "2026-03-23": 1096.89, "2026-03-24": 1121.4399, "2026-03-25": 1159.55, "2026-03-26": 1136.64, "2026-03-27": 1141.51, "2026-03-30": 1107.05, "2026-03-31": 1052.39, "2026-04-01": 1116.1801, "2026-04-02": 1056.34, "2026-04-03": 1063.75, "2026-04-06": 1047.37, "2026-04-07": 1036.73, "2026-04-08": 1089.85, "2026-04-09": 1076.0, "2026-04-10": 1093.63, "2026-04-13": 1099.84, "2026-04-14": 1121.88, "2026-04-15": 1152.4301, "2026-04-16": 1162.97, "2026-04-17": 1170.04, "2026-04-20": 1174.85, "2026-04-21": 1179.03, "2026-04-22": 1181.12, "2026-04-23": 1174.3101, "2026-04-24": 1203.84, "2026-04-27": 1226.1801, "2026-04-28": 1215.58, "2026-04-29": 1220.26, "2026-04-30": 1192.35, "2026-05-04": 1213.74, "2026-05-06": 1210.17, "2026-05-07": 1199.1801, "2026-05-08": 1207.72, "2026-05-11": 1207.34, "2026-05-12": 1179.29, "2026-05-13": 1176.9301, "2026-05-14": 1191.09, "2026-05-15": 1129.8199, "2026-05-18": 1111.09, "2026-05-19": 1084.36, "2026-05-20": 1056.0699, "2026-05-21": 1105.97, "2026-05-22": 1161.13, "2026-05-26": 1172.52, "2026-05-27": 1133.13, "2026-05-28": 1104.36, "2026-05-29": 1074.8, "2026-06-01": 1050.03, "2026-06-02": 1026.03, "2026-06-04": 1049.73, "2026-06-05": 1002.44, "2026-06-08": 911.39, "2026-06-09": 967.81, "2026-06-10": 951.63, "2026-06-11": 996.93, "2026-06-12": 1029.05, "2026-06-15": 1034.03, "2026-06-16": 1018.68, "2026-06-17": 1031.96, "2026-06-18": 1000.93, "2026-06-19": 966.59, "2026-06-22": 968.4, "2026-06-23": 891.52, "2026-06-24": 909.31, "2026-06-25": 887.81, "2026-06-26": 851.37, "2026-06-29": 920.57, "2026-06-30": 916.18, "2026-07-01": 929.35, "2026-07-02": 866.72, "2026-07-03": 868.41, "2026-07-06": 847.07, "2026-07-07": 831.23, "2026-07-08": 785.0, "2026-07-09": 794.0, "2026-07-10": 837.43, "2026-07-13": 799.36, "2026-07-14": 783.98, "2026-07-15": 829.43, "2026-07-16": 791.84, "2026-07-20": 749.64, "2026-07-21": 753.34, "2026-07-22": 751.09, "2026-07-23": 790.28, "2026-07-24": 748.22, "2026-07-27": 764.86, "2026-07-28": 705.85, "2026-07-29": 662.68, "2026-07-30": 644.78, "2026-07-31": 719.76, "2026-08-03": 737.35, "2026-08-04": 780.72, "2026-08-05": 799.59, "2026-08-06": 801.67, "2026-08-07": 798.81, "2026-08-10": 854.47, "2026-08-11": 857.84, "2026-08-12": 858.91, "2026-08-13": 861.37, "2026-08-14": 864.65, "2026-08-18": 834.2, "2026-08-19": 824.46, "2026-08-20": 840.89, "2026-08-21": 801.94, "2026-08-24": 813.33, "2026-08-25": 827.15, "2026-08-26": 826.87, "2026-08-27": 837.65, "2026-08-28": 838.41, "2026-08-31": 834.29, "2026-09-01": 821.25, "2026-09-02": 803.98, "2026-09-03": 790.21, "2026-09-04": 813.5, "2026-09-07": 822.19, "2026-09-08": 811.88, "2026-09-09": 830.37, "2026-09-10": 836.92, "2026-09-11": 820.64, "2026-09-14": 806.79, "2026-09-15": 812.41, "2026-09-16": 815.98, "2026-09-17": 822.18, "2026-09-18": 827.12, "2026-09-21": 836.27, "2026-09-22": 834.38, "2026-09-23": 844.48, "2026-09-28": 846.58, "2026-09-29": 849.8, "2026-09-30": 855.91, "2026-10-01": 894.29, "2026-10-02": 893.29, "2026-10-06": 919.92, "2026-10-07": 898.43, "2026-10-08": 892.27, "2026-10-12": 849.19, "2026-10-13": 837.03, "2026-10-14": 823.88, "2026-10-15": 760.82, "2026-10-16": 794.78, "2026-10-19": 808.89, "2026-10-20": 781.97, "2026-10-21": 792.76, "2026-10-22": 764.1, "2026-10-23": 751.69, "2026-10-26": 727.21, "2026-10-27": 743.83, "2026-10-28": 771.28, "2026-10-29": 753.23, "2026-10-30": 724.38, "2026-11-02": 734.36}, "weekly": {"2025-11-03": 876.81, "2025-11-10": 897.9, "2025-11-17": 863.95, "2025-11-24": 912.67, "2025-12-01": 924.74, "2025-12-08": 937.34, "2025-12-15": 915.27, "2025-12-22": 919.67, "2025-12-29": 945.57, "2026-01-05": 947.92, "2026-01-12": 954.59, "2026-01-19": 993.93, "2026-01-26": 1149.4399, "2026-02-02": 1080.77, "2026-02-09": 1106.08, "2026-02-16": 1154.0, "2026-02-23": 1192.78, "2026-03-02": 1154.67, "2026-03-09": 1152.96, "2026-03-16": 1161.52, "2026-03-23": 1141.51, "2026-03-30": 1063.75, "2026-04-06": 1093.63, "2026-04-13": 1170.04, "2026-04-20": 1203.84, "2026-04-27": 1192.35, "2026-05-04": 1207.72, "2026-05-11": 1129.8199, "2026-05-18": 1161.13, "2026-05-25": 1074.8, "2026-06-01": 1002.44, "2026-06-08": 1029.05, "2026-06-15": 966.59, "2026-06-22": 851.37, "2026-06-29": 868.41, "2026-07-06": 837.43, "2026-07-13": 791.84, "2026-07-20": 748.22, "2026-07-27": 719.76, "2026-08-03": 798.81, "2026-08-10": 864.65, "2026-08-17": 801.94, "2026-08-24": 838.41, "2026-08-31": 813.5, "2026-09-07": 820.64, "2026-09-14": 827.12, "2026-09-21": 844.48, "2026-09-28": 893.29, "2026-10-05": 892.27, "2026-10-12": 794.78, "2026-10-19": 751.69, "2026-10-26": 724.38, "2026-11-02": 734.36}, "monthly": {"2025-11-01": 912.67, "2025-12-01": 925.47, "2026-01-01": 1149.4399, "2026-02-01": 1192.78, "2026-03-01": 1052.39, "2026-04-01": 1192.35, "2026-05-01": 1074.8, "2026-06-01": 916.18, "2026-07-01": 719.76, "2026-08-01": 834.29, "2026-09-01": 855.91, "2026-10-01": 724.38, "2026-11-01": 734.36}, "inflections": [{"date": "2026-03-05", "value": 1116.41, "change_pct": 14.1}, {"date": "2026-03-04", "value": 978.44, "change_pct": -14.0}, {"date": "2026-07-31", "value": 719.76, "change_pct": 11.63}, {"date": "2026-06-08", "value": 911.39, "change_pct": -9.08}, {"date": "2026-06-29", "value": 920.57, "change_pct": 8.13}]}, "DOW": {"group": "증시", "color": "#946312", "daily": {"2025-11-03": 47336.6797, "2025-11-04": 47085.2383, "2025-11-05": 47311.0, "2025-11-06": 46912.3008, "2025-11-07": 46987.1016, "2025-11-10": 47368.6289, "2025-11-11": 47927.9609, "2025-11-12": 48254.8203, "2025-11-13": 47457.2188, "2025-11-14": 47147.4805, "2025-11-17": 46590.2383, "2025-11-18": 46091.7383, "2025-11-19": 46138.7695, "2025-11-20": 45752.2617, "2025-11-21": 46245.4102, "2025-11-24": 46448.2695, "2025-11-25": 47112.4492, "2025-11-26": 47427.1211, "2025-11-28": 47716.4219, "2025-12-01": 47289.3281, "2025-12-02": 47474.4609, "2025-12-03": 47882.8984, "2025-12-04": 47850.9414, "2025-12-05": 47954.9883, "2025-12-08": 47739.3203, "2025-12-09": 47560.2891, "2025-12-10": 48057.75, "2025-12-11": 48704.0117, "2025-12-12": 48458.0508, "2025-12-15": 48416.5586, "2025-12-16": 48114.2617, "2025-12-17": 47885.9688, "2025-12-18": 47951.8516, "2025-12-19": 48134.8906, "2025-12-22": 48362.6797, "2025-12-23": 48442.4102, "2025-12-24": 48731.1602, "2025-12-26": 48710.9688, "2025-12-29": 48461.9297, "2025-12-30": 48367.0586, "2025-12-31": 48063.2891, "2026-01-02": 48382.3906, "2026-01-05": 48977.1797, "2026-01-06": 49462.0781, "2026-01-07": 48996.0781, "2026-01-08": 49266.1094, "2026-01-09": 49504.0703, "2026-01-12": 49590.1992, "2026-01-13": 49191.9883, "2026-01-14": 49149.6289, "2026-01-15": 49442.4414, "2026-01-16": 49359.3281, "2026-01-20": 48488.5898, "2026-01-21": 49077.2305, "2026-01-22": 49384.0117, "2026-01-23": 49098.7109, "2026-01-26": 49412.3984, "2026-01-27": 49003.4102, "2026-01-28": 49015.6016, "2026-01-29": 49071.5586, "2026-01-30": 48892.4688, "2026-02-02": 49407.6602, "2026-02-03": 49240.9883, "2026-02-04": 49501.3008, "2026-02-05": 48908.7188, "2026-02-06": 50115.6719, "2026-02-09": 50135.8711, "2026-02-10": 50188.1406, "2026-02-11": 50121.3984, "2026-02-12": 49451.9805, "2026-02-13": 49500.9297, "2026-02-17": 49533.1914, "2026-02-18": 49662.6602, "2026-02-19": 49395.1602, "2026-02-20": 49625.9688, "2026-02-23": 48804.0586, "2026-02-24": 49174.5, "2026-02-25": 49482.1484, "2026-02-26": 49499.1992, "2026-02-27": 48977.9219, "2026-03-02": 48904.7812, "2026-03-03": 48501.2695, "2026-03-04": 48739.4102, "2026-03-05": 47954.7383, "2026-03-06": 47501.5508, "2026-03-09": 47740.8008, "2026-03-10": 47706.5117, "2026-03-11": 47417.2695, "2026-03-12": 46677.8516, "2026-03-13": 46558.4688, "2026-03-16": 46946.4102, "2026-03-17": 46993.2617, "2026-03-18": 46225.1484, "2026-03-19": 46021.4297, "2026-03-20": 45577.4688, "2026-03-23": 46208.4688, "2026-03-24": 46124.0586, "2026-03-25": 46429.4883, "2026-03-26": 45960.1094, "2026-03-27": 45166.6406, "2026-03-30": 45216.1406, "2026-03-31": 46341.5117, "2026-04-01": 46565.7383, "2026-04-02": 46504.6719, "2026-04-06": 46669.8789, "2026-04-07": 46584.4609, "2026-04-08": 47909.9219, "2026-04-09": 48185.8008, "2026-04-10": 47916.5703, "2026-04-13": 48218.25, "2026-04-14": 48535.9883, "2026-04-15": 48463.7188, "2026-04-16": 48578.7188, "2026-04-17": 49447.4297, "2026-04-20": 49442.5586, "2026-04-21": 49149.3789, "2026-04-22": 49490.0312, "2026-04-23": 49310.3203, "2026-04-24": 49230.7109, "2026-04-27": 49167.7891, "2026-04-28": 49141.9297, "2026-04-29": 48861.8086, "2026-04-30": 49652.1406, "2026-05-01": 49499.2695, "2026-05-04": 48941.8984, "2026-05-05": 49298.25, "2026-05-06": 49910.5898, "2026-05-07": 49596.9688, "2026-05-08": 49609.1602, "2026-05-11": 49704.4688, "2026-05-12": 49760.5586, "2026-05-13": 49693.1992, "2026-05-14": 50063.4609, "2026-05-15": 49526.1719, "2026-05-18": 49686.1211, "2026-05-19": 49363.8789, "2026-05-20": 50009.3516, "2026-05-21": 50285.6602, "2026-05-22": 50579.6992, "2026-05-26": 50461.6797, "2026-05-27": 50644.2812, "2026-05-28": 50668.9688, "2026-05-29": 51032.4609, "2026-06-01": 51078.8789, "2026-06-02": 51307.7891, "2026-06-03": 50687.0703, "2026-06-04": 51561.9297, "2026-06-05": 50866.7812, "2026-06-08": 50786.0117, "2026-06-09": 50872.1094, "2026-06-10": 49918.7812, "2026-06-11": 50848.75, "2026-06-12": 51202.2617, "2026-06-15": 51671.0312, "2026-06-16": 51999.6719, "2026-06-17": 51492.5508, "2026-06-18": 51564.6992, "2026-06-22": 51712.7109, "2026-06-23": 51666.8398, "2026-06-24": 51848.8984, "2026-06-25": 51920.6211, "2026-06-26": 51876.1094, "2026-06-29": 52182.7383, "2026-06-30": 52319.1992, "2026-07-01": 52305.2383, "2026-07-02": 52900.0703, "2026-07-06": 53055.9102, "2026-07-07": 52925.1484, "2026-07-08": 52348.3906, "2026-07-09": 52487.4102, "2026-07-10": 52637.0117, "2026-07-13": 52498.6406, "2026-07-14": 52508.2695, "2026-07-15": 52658.6406, "2026-07-16": 52552.9688, "2026-07-17": 52146.4219, "2026-07-20": 51839.2617, "2026-07-21": 52224.6406, "2026-07-22": 52218.5781, "2026-07-23": 51711.6484, "2026-07-24": 51947.25, "2026-07-27": 52210.0781, "2026-07-28": 52747.3203, "2026-07-29": 51594.1406, "2026-07-30": 52208.0586, "2026-07-31": 52485.0312, "2026-08-03": 53178.4102, "2026-08-04": 54085.8789, "2026-08-05": 54349.1211, "2026-08-06": 53885.1016, "2026-08-07": 54036.9297, "2026-08-10": 53975.9805, "2026-08-11": 53791.8516, "2026-08-12": 53770.2695, "2026-08-13": 53839.9883, "2026-08-14": 53732.4102, "2026-08-17": 53459.7812, "2026-08-18": 53343.3984, "2026-08-19": 53463.0508, "2026-08-20": 52759.2109, "2026-08-21": 53277.0117, "2026-08-24": 53417.1602, "2026-08-25": 53577.3984, "2026-08-26": 53463.8789, "2026-08-27": 53569.4414, "2026-08-28": 53559.9883, "2026-08-31": 53185.8984, "2026-09-01": 52766.8789, "2026-09-02": 53061.9492, "2026-09-03": 53686.1094, "2026-09-04": 53414.25, "2026-09-08": 52786.0703, "2026-09-09": 52380.6602, "2026-09-10": 52064.1016, "2026-09-11": 52573.2891, "2026-09-14": 52421.1992, "2026-09-15": 52093.1094, "2026-09-16": 51461.8984, "2026-09-17": 51778.0391, "2026-09-18": 51682.6406, "2026-09-21": 52048.8281, "2026-09-22": 51863.6914, "2026-09-23": 51511.5898, "2026-09-24": 51349.9805, "2026-09-25": 51828.6211, "2026-09-28": 51481.5117, "2026-09-29": 51349.9219, "2026-09-30": 50906.0508, "2026-10-01": 50926.5586, "2026-10-02": 51176.9609, "2026-10-05": 51267.8984, "2026-10-06": 51521.2812, "2026-10-07": 51179.8711, "2026-10-08": 51231.6406, "2026-10-09": 51654.9492, "2026-10-12": 51850.5508, "2026-10-13": 51670.1016, "2026-10-14": 51621.4805, "2026-10-15": 52177.6914, "2026-10-16": 52002.4102, "2026-10-19": 51966.0312, "2026-10-20": 52495.8789, "2026-10-21": 52856.0898, "2026-10-22": 52867.9805, "2026-10-23": 52215.1602, "2026-10-26": 52361.5781, "2026-10-27": 52377.5703, "2026-10-28": 52475.1016, "2026-10-29": 52342.5586, "2026-10-30": 51770.3086, "2026-11-02": 51983.9805}, "weekly": {"2025-11-03": 46987.1016, "2025-11-10": 47147.4805, "2025-11-17": 46245.4102, "2025-11-24": 47716.4219, "2025-12-01": 47954.9883, "2025-12-08": 48458.0508, "2025-12-15": 48134.8906, "2025-12-22": 48710.9688, "2025-12-29": 48382.3906, "2026-01-05": 49504.0703, "2026-01-12": 49359.3281, "2026-01-19": 49098.7109, "2026-01-26": 48892.4688, "2026-02-02": 50115.6719, "2026-02-09": 49500.9297, "2026-02-16": 49625.9688, "2026-02-23": 48977.9219, "2026-03-02": 47501.5508, "2026-03-09": 46558.4688, "2026-03-16": 45577.4688, "2026-03-23": 45166.6406, "2026-03-30": 46504.6719, "2026-04-06": 47916.5703, "2026-04-13": 49447.4297, "2026-04-20": 49230.7109, "2026-04-27": 49499.2695, "2026-05-04": 49609.1602, "2026-05-11": 49526.1719, "2026-05-18": 50579.6992, "2026-05-25": 51032.4609, "2026-06-01": 50866.7812, "2026-06-08": 51202.2617, "2026-06-15": 51564.6992, "2026-06-22": 51876.1094, "2026-06-29": 52900.0703, "2026-07-06": 52637.0117, "2026-07-13": 52146.4219, "2026-07-20": 51947.25, "2026-07-27": 52485.0312, "2026-08-03": 54036.9297, "2026-08-10": 53732.4102, "2026-08-17": 53277.0117, "2026-08-24": 53559.9883, "2026-08-31": 53414.25, "2026-09-07": 52573.2891, "2026-09-14": 51682.6406, "2026-09-21": 51828.6211, "2026-09-28": 51176.9609, "2026-10-05": 51654.9492, "2026-10-12": 52002.4102, "2026-10-19": 52215.1602, "2026-10-26": 51770.3086, "2026-11-02": 51983.9805}, "monthly": {"2025-11-01": 47716.4219, "2025-12-01": 48063.2891, "2026-01-01": 48892.4688, "2026-02-01": 48977.9219, "2026-03-01": 46341.5117, "2026-04-01": 49652.1406, "2026-05-01": 51032.4609, "2026-06-01": 52319.1992, "2026-07-01": 52485.0312, "2026-08-01": 53185.8984, "2026-09-01": 50906.0508, "2026-10-01": 51770.3086, "2026-11-01": 51983.9805}, "inflections": [{"date": "2026-04-08", "value": 47909.9219, "change_pct": 2.85}, {"date": "2026-03-31", "value": 46341.5117, "change_pct": 2.49}, {"date": "2026-02-06", "value": 50115.6719, "change_pct": 2.47}, {"date": "2026-07-29", "value": 51594.1406, "change_pct": -2.19}, {"date": "2026-06-10", "value": 49918.7812, "change_pct": -1.87}]}, "NASDAQ": {"group": "증시", "color": "#BC8118", "daily": {"2025-11-03": 23834.7207, "2025-11-04": 23348.6406, "2025-11-05": 23499.8008, "2025-11-06": 23053.9902, "2025-11-07": 23004.5391, "2025-11-10": 23527.1699, "2025-11-11": 23468.3008, "2025-11-12": 23406.4609, "2025-11-13": 22870.3594, "2025-11-14": 22900.5898, "2025-11-17": 22708.0703, "2025-11-18": 22432.8496, "2025-11-19": 22564.2305, "2025-11-20": 22078.0508, "2025-11-21": 22273.0801, "2025-11-24": 22872.0098, "2025-11-25": 23025.5898, "2025-11-26": 23214.6895, "2025-11-28": 23365.6895, "2025-12-01": 23275.9199, "2025-12-02": 23413.6699, "2025-12-03": 23454.0898, "2025-12-04": 23505.1406, "2025-12-05": 23578.1309, "2025-12-08": 23545.9004, "2025-12-09": 23576.4902, "2025-12-10": 23654.1504, "2025-12-11": 23593.8594, "2025-12-12": 23195.1699, "2025-12-15": 23057.4102, "2025-12-16": 23111.4609, "2025-12-17": 22693.3203, "2025-12-18": 23006.3594, "2025-12-19": 23307.6191, "2025-12-22": 23428.8301, "2025-12-23": 23561.8398, "2025-12-24": 23613.3105, "2025-12-26": 23593.0996, "2025-12-29": 23474.3496, "2025-12-30": 23419.0801, "2025-12-31": 23241.9902, "2026-01-02": 23235.6309, "2026-01-05": 23395.8203, "2026-01-06": 23547.1699, "2026-01-07": 23584.2793, "2026-01-08": 23480.0195, "2026-01-09": 23671.3496, "2026-01-12": 23733.9004, "2026-01-13": 23709.8691, "2026-01-14": 23471.75, "2026-01-15": 23530.0195, "2026-01-16": 23515.3906, "2026-01-20": 22954.3203, "2026-01-21": 23224.8203, "2026-01-22": 23436.0195, "2026-01-23": 23501.2402, "2026-01-26": 23601.3594, "2026-01-27": 23817.0996, "2026-01-28": 23857.4492, "2026-01-29": 23685.1191, "2026-01-30": 23461.8203, "2026-02-02": 23592.1094, "2026-02-03": 23255.1895, "2026-02-04": 22904.5801, "2026-02-05": 22540.5898, "2026-02-06": 23031.2109, "2026-02-09": 23238.6699, "2026-02-10": 23102.4707, "2026-02-11": 23066.4707, "2026-02-12": 22597.1504, "2026-02-13": 22546.6699, "2026-02-17": 22578.3809, "2026-02-18": 22753.6309, "2026-02-19": 22682.7305, "2026-02-20": 22886.0703, "2026-02-23": 22627.2695, "2026-02-24": 22863.6797, "2026-02-25": 23152.0801, "2026-02-26": 22878.3809, "2026-02-27": 22668.2109, "2026-03-02": 22748.8594, "2026-03-03": 22516.6895, "2026-03-04": 22807.4805, "2026-03-05": 22748.9902, "2026-03-06": 22387.6797, "2026-03-09": 22695.9492, "2026-03-10": 22697.0996, "2026-03-11": 22716.1309, "2026-03-12": 22311.9805, "2026-03-13": 22105.3594, "2026-03-16": 22374.1797, "2026-03-17": 22479.5293, "2026-03-18": 22152.4199, "2026-03-19": 22090.6895, "2026-03-20": 21647.6094, "2026-03-23": 21946.7598, "2026-03-24": 21761.8906, "2026-03-25": 21929.8203, "2026-03-26": 21408.0801, "2026-03-27": 20948.3594, "2026-03-30": 20794.6406, "2026-03-31": 21590.6309, "2026-04-01": 21840.9492, "2026-04-02": 21879.1797, "2026-04-06": 21996.3398, "2026-04-07": 22017.8496, "2026-04-08": 22634.9902, "2026-04-09": 22822.4199, "2026-04-10": 22902.8906, "2026-04-13": 23183.7402, "2026-04-14": 23639.0801, "2026-04-15": 24016.0195, "2026-04-16": 24102.6992, "2026-04-17": 24468.4805, "2026-04-20": 24404.3906, "2026-04-21": 24259.9609, "2026-04-22": 24657.5703, "2026-04-23": 24438.5, "2026-04-24": 24836.5996, "2026-04-27": 24887.0996, "2026-04-28": 24663.8008, "2026-04-29": 24673.2402, "2026-04-30": 24892.3105, "2026-05-01": 25114.4395, "2026-05-04": 25067.8008, "2026-05-05": 25326.1309, "2026-05-06": 25838.9395, "2026-05-07": 25806.1992, "2026-05-08": 26247.0801, "2026-05-11": 26274.1309, "2026-05-12": 26088.1992, "2026-05-13": 26402.3398, "2026-05-14": 26635.2207, "2026-05-15": 26225.1406, "2026-05-18": 26090.7305, "2026-05-19": 25870.7109, "2026-05-20": 26270.3594, "2026-05-21": 26293.0996, "2026-05-22": 26343.9707, "2026-05-26": 26656.1797, "2026-05-27": 26674.7305, "2026-05-28": 26917.4707, "2026-05-29": 26972.6191, "2026-06-01": 27086.8105, "2026-06-02": 27093.9004, "2026-06-03": 26853.9805, "2026-06-04": 26830.9609, "2026-06-05": 25709.4297, "2026-06-08": 25929.6602, "2026-06-09": 25678.8203, "2026-06-10": 25169.5, "2026-06-11": 25809.6602, "2026-06-12": 25888.8398, "2026-06-15": 26683.9395, "2026-06-16": 26376.3398, "2026-06-17": 26021.6602, "2026-06-18": 26517.9297, "2026-06-22": 26166.5996, "2026-06-23": 25587.0391, "2026-06-24": 25476.6406, "2026-06-25": 25358.5996, "2026-06-26": 25297.6191, "2026-06-29": 25820.1406, "2026-06-30": 26213.7207, "2026-07-01": 26040.0293, "2026-07-02": 25832.6699, "2026-07-06": 26121.1602, "2026-07-07": 25818.6895, "2026-07-08": 25870.6504, "2026-07-09": 26206.8906, "2026-07-10": 26281.6094, "2026-07-13": 25873.1797, "2026-07-14": 26107.0098, "2026-07-15": 26269.2305, "2026-07-16": 25881.9492, "2026-07-17": 25520.2402, "2026-07-20": 25508.0703, "2026-07-21": 25837.2109, "2026-07-22": 25690.9004, "2026-07-23": 25137.6895, "2026-07-24": 24975.8203, "2026-07-27": 24932.0801, "2026-07-28": 24876.9102, "2026-07-29": 24442.9395, "2026-07-30": 25122.1797, "2026-07-31": 25373.8496, "2026-08-03": 25913.9004, "2026-08-04": 26584.9902, "2026-08-05": 26363.4395, "2026-08-06": 26348.3496, "2026-08-07": 26690.6191, "2026-08-10": 26605.3594, "2026-08-11": 26445.4492, "2026-08-12": 26588.4902, "2026-08-13": 26803.0293, "2026-08-14": 26729.1602, "2026-08-17": 26644.9102, "2026-08-18": 26289.7109, "2026-08-19": 26331.0898, "2026-08-20": 26067.1699, "2026-08-21": 26180.4609, "2026-08-24": 25980.1895, "2026-08-25": 26151.3008, "2026-08-26": 26130.1992, "2026-08-27": 26541.3496, "2026-08-28": 26402.4199, "2026-08-31": 26370.8906, "2026-09-01": 26099.7695, "2026-09-02": 26217.8301, "2026-09-03": 26584.0605, "2026-09-04": 26506.9902, "2026-09-08": 26421.4102, "2026-09-09": 26253.3398, "2026-09-10": 26081.7207, "2026-09-11": 26333.0391, "2026-09-14": 26186.4102, "2026-09-15": 25981.5703, "2026-09-16": 25978.4297, "2026-09-17": 26418.3008, "2026-09-18": 26522.5391, "2026-09-21": 27122.0898, "2026-09-22": 27244.2793, "2026-09-23": 26936.0391, "2026-09-24": 26939.3691, "2026-09-25": 27068.7207, "2026-09-28": 26820.3809, "2026-09-29": 26797.5391, "2026-09-30": 26861.0605, "2026-10-01": 26871.5996, "2026-10-02": 27190.8594, "2026-10-05": 27477.3105, "2026-10-06": 27599.7891, "2026-10-07": 27538.6895, "2026-10-08": 27193.3398, "2026-10-09": 27366.1699, "2026-10-12": 27245.9004, "2026-10-13": 27204.3809, "2026-10-14": 26692.8691, "2026-10-15": 26713.0293, "2026-10-16": 26140.0293, "2026-10-19": 26430.8906, "2026-10-20": 26424.8203, "2026-10-21": 26702.8594, "2026-10-22": 26008.8594, "2026-10-23": 25955.3398, "2026-10-26": 26169.3809, "2026-10-27": 26477.8105, "2026-10-28": 26549.8496, "2026-10-29": 26184.7207, "2026-10-30": 25437.0, "2026-11-02": 25164.3105}, "weekly": {"2025-11-03": 23004.5391, "2025-11-10": 22900.5898, "2025-11-17": 22273.0801, "2025-11-24": 23365.6895, "2025-12-01": 23578.1309, "2025-12-08": 23195.1699, "2025-12-15": 23307.6191, "2025-12-22": 23593.0996, "2025-12-29": 23235.6309, "2026-01-05": 23671.3496, "2026-01-12": 23515.3906, "2026-01-19": 23501.2402, "2026-01-26": 23461.8203, "2026-02-02": 23031.2109, "2026-02-09": 22546.6699, "2026-02-16": 22886.0703, "2026-02-23": 22668.2109, "2026-03-02": 22387.6797, "2026-03-09": 22105.3594, "2026-03-16": 21647.6094, "2026-03-23": 20948.3594, "2026-03-30": 21879.1797, "2026-04-06": 22902.8906, "2026-04-13": 24468.4805, "2026-04-20": 24836.5996, "2026-04-27": 25114.4395, "2026-05-04": 26247.0801, "2026-05-11": 26225.1406, "2026-05-18": 26343.9707, "2026-05-25": 26972.6191, "2026-06-01": 25709.4297, "2026-06-08": 25888.8398, "2026-06-15": 26517.9297, "2026-06-22": 25297.6191, "2026-06-29": 25832.6699, "2026-07-06": 26281.6094, "2026-07-13": 25520.2402, "2026-07-20": 24975.8203, "2026-07-27": 25373.8496, "2026-08-03": 26690.6191, "2026-08-10": 26729.1602, "2026-08-17": 26180.4609, "2026-08-24": 26402.4199, "2026-08-31": 26506.9902, "2026-09-07": 26333.0391, "2026-09-14": 26522.5391, "2026-09-21": 27068.7207, "2026-09-28": 27190.8594, "2026-10-05": 27366.1699, "2026-10-12": 26140.0293, "2026-10-19": 25955.3398, "2026-10-26": 25437.0, "2026-11-02": 25164.3105}, "monthly": {"2025-11-01": 23365.6895, "2025-12-01": 23241.9902, "2026-01-01": 23461.8203, "2026-02-01": 22668.2109, "2026-03-01": 21590.6309, "2026-04-01": 24892.3105, "2026-05-01": 26972.6191, "2026-06-01": 26213.7207, "2026-07-01": 25373.8496, "2026-08-01": 26370.8906, "2026-09-01": 26861.0605, "2026-10-01": 25437.0, "2026-11-01": 25164.3105}, "inflections": [{"date": "2026-06-05", "value": 25709.4297, "change_pct": -4.18}, {"date": "2026-03-31", "value": 21590.6309, "change_pct": 3.83}, {"date": "2026-06-15", "value": 26683.9395, "change_pct": 3.07}, {"date": "2026-10-30", "value": 25437.0, "change_pct": -2.86}, {"date": "2026-04-08", "value": 22634.9902, "change_pct": 2.8}]}, "상해종합": {"group": "증시", "color": "#C04824", "daily": {"2025-11-03": 3976.521, "2025-11-04": 3960.186, "2025-11-05": 3969.248, "2025-11-06": 4007.76, "2025-11-07": 3997.5559, "2025-11-10": 4018.5969, "2025-11-11": 4002.7581, "2025-11-12": 4000.1399, "2025-11-13": 4029.501, "2025-11-14": 3990.4919, "2025-11-17": 3972.0349, "2025-11-18": 3939.813, "2025-11-19": 3946.7419, "2025-11-20": 3931.051, "2025-11-21": 3834.8911, "2025-11-24": 3836.7649, "2025-11-25": 3870.0229, "2025-11-26": 3864.1841, "2025-11-27": 3875.26, "2025-11-28": 3888.5959, "2025-12-01": 3914.0061, "2025-12-02": 3897.7119, "2025-12-03": 3878.0, "2025-12-04": 3875.793, "2025-12-05": 3902.8081, "2025-12-08": 3924.0779, "2025-12-09": 3909.521, "2025-12-10": 3900.4961, "2025-12-11": 3873.3181, "2025-12-12": 3889.3459, "2025-12-15": 3867.9209, "2025-12-16": 3824.812, "2025-12-17": 3870.2781, "2025-12-18": 3876.3711, "2025-12-19": 3890.448, "2025-12-22": 3917.364, "2025-12-23": 3919.979, "2025-12-24": 3940.947, "2025-12-25": 3959.6211, "2025-12-26": 3963.679, "2025-12-29": 3965.28, "2025-12-30": 3965.116, "2025-12-31": 3968.8401, "2026-01-05": 4023.417, "2026-01-06": 4083.667, "2026-01-07": 4085.772, "2026-01-08": 4082.979, "2026-01-09": 4120.4258, "2026-01-12": 4165.2871, "2026-01-13": 4138.7578, "2026-01-14": 4126.0928, "2026-01-15": 4112.6011, "2026-01-16": 4101.9131, "2026-01-19": 4114.0, "2026-01-20": 4113.6489, "2026-01-21": 4116.9399, "2026-01-22": 4122.5762, "2026-01-23": 4136.1641, "2026-01-26": 4132.605, "2026-01-27": 4139.9038, "2026-01-28": 4151.2378, "2026-01-29": 4157.9839, "2026-01-30": 4117.9482, "2026-02-02": 4015.7461, "2026-02-03": 4067.738, "2026-02-04": 4102.2021, "2026-02-05": 4075.917, "2026-02-06": 4065.583, "2026-02-09": 4123.0898, "2026-02-10": 4128.373, "2026-02-11": 4131.9849, "2026-02-12": 4134.0181, "2026-02-13": 4082.073, "2026-02-24": 4117.4092, "2026-02-25": 4147.23, "2026-02-26": 4146.6309, "2026-02-27": 4162.8809, "2026-03-02": 4182.5908, "2026-03-03": 4122.6758, "2026-03-04": 4082.4741, "2026-03-05": 4108.5669, "2026-03-06": 4124.1938, "2026-03-09": 4096.603, "2026-03-10": 4123.1382, "2026-03-11": 4133.4331, "2026-03-12": 4129.103, "2026-03-13": 4095.448, "2026-03-16": 4084.7859, "2026-03-17": 4049.907, "2026-03-18": 4062.9839, "2026-03-19": 4006.552, "2026-03-20": 3957.053, "2026-03-23": 3813.283, "2026-03-24": 3881.28, "2026-03-25": 3931.8369, "2026-03-26": 3889.083, "2026-03-27": 3913.7241, "2026-03-30": 3923.2871, "2026-03-31": 3891.8611, "2026-04-01": 3948.552, "2026-04-02": 3919.2849, "2026-04-03": 3880.0969, "2026-04-07": 3890.165, "2026-04-08": 3994.998, "2026-04-09": 3966.1709, "2026-04-10": 3986.2251, "2026-04-13": 3988.5581, "2026-04-14": 4026.625, "2026-04-15": 4027.209, "2026-04-16": 4055.5471, "2026-04-17": 4051.425, "2026-04-20": 4082.127, "2026-04-21": 4085.0769, "2026-04-22": 4106.2578, "2026-04-23": 4093.25, "2026-04-24": 4079.8999, "2026-04-27": 4086.344, "2026-04-28": 4078.637, "2026-04-29": 4107.5142, "2026-04-30": 4112.1592, "2026-05-06": 4160.1738, "2026-05-07": 4180.0918, "2026-05-08": 4179.9531, "2026-05-11": 4225.021, "2026-05-12": 4214.4888, "2026-05-13": 4242.5718, "2026-05-14": 4177.917, "2026-05-15": 4135.3892, "2026-05-18": 4131.5278, "2026-05-19": 4169.5381, "2026-05-20": 4162.1851, "2026-05-21": 4077.2771, "2026-05-22": 4112.8989, "2026-05-25": 4152.5679, "2026-05-26": 4145.373, "2026-05-27": 4093.7271, "2026-05-28": 4098.6362, "2026-05-29": 4068.5691, "2026-06-01": 4057.74, "2026-06-02": 4075.1021, "2026-06-03": 4083.9741, "2026-06-04": 4057.781, "2026-06-05": 4027.7361, "2026-06-08": 3959.3379, "2026-06-09": 4010.031, "2026-06-10": 3993.2261, "2026-06-11": 3987.0149, "2026-06-12": 4031.5129, "2026-06-15": 4096.4722, "2026-06-16": 4091.8921, "2026-06-17": 4108.0762, "2026-06-18": 4090.481, "2026-06-22": 4163.0972, "2026-06-23": 4106.251, "2026-06-24": 4110.813, "2026-06-25": 4120.2808, "2026-06-26": 4027.2649, "2026-06-29": 4073.9021, "2026-06-30": 4094.397, "2026-07-01": 4112.4448, "2026-07-02": 4028.9041, "2026-07-03": 4043.6431, "2026-07-06": 4041.238, "2026-07-07": 3990.2351, "2026-07-08": 3970.8799, "2026-07-09": 4036.5879, "2026-07-10": 3996.1621, "2026-07-13": 3913.7939, "2026-07-14": 3967.126, "2026-07-15": 3955.5779, "2026-07-16": 3882.4131, "2026-07-17": 3764.155, "2026-07-20": 3796.281, "2026-07-21": 3864.3669, "2026-07-22": 3867.0339, "2026-07-23": 3876.7771, "2026-07-24": 3814.198, "2026-07-27": 3858.2451, "2026-07-28": 3813.3149, "2026-07-29": 3828.469, "2026-07-30": 3804.6931, "2026-07-31": 3832.262, "2026-08-03": 3809.6631, "2026-08-04": 3822.2849, "2026-08-05": 3878.4299, "2026-08-06": 3900.3521, "2026-08-07": 3940.0371, "2026-08-10": 3966.594, "2026-08-11": 3934.093, "2026-08-12": 3946.675, "2026-08-13": 3926.9651, "2026-08-14": 3927.177, "2026-08-17": 3982.6541, "2026-08-18": 3990.304, "2026-08-19": 3894.4221, "2026-08-20": 3903.7209, "2026-08-21": 3905.2029, "2026-08-24": 3882.0081, "2026-08-25": 3889.4451, "2026-08-26": 3912.5229, "2026-08-27": 3956.571, "2026-08-28": 3952.179, "2026-08-31": 3986.2981, "2026-09-01": 3979.8879, "2026-09-02": 3941.386, "2026-09-03": 3942.0879, "2026-09-04": 3930.116, "2026-09-07": 3932.699, "2026-09-08": 3940.551, "2026-09-09": 3951.5071, "2026-09-10": 3934.4041, "2026-09-11": 3888.1111, "2026-09-14": 3885.333, "2026-09-15": 3864.2791, "2026-09-16": 3891.6011, "2026-09-17": 3875.604, "2026-09-18": 3911.8711, "2026-09-21": 3949.907, "2026-09-22": 3952.1279, "2026-09-23": 3936.52, "2026-09-24": 3888.374, "2026-09-28": 3823.6211, "2026-09-29": 3830.4509, "2026-09-30": 3842.1951, "2026-10-08": 3811.9041, "2026-10-09": 3813.791, "2026-10-12": 3797.2419, "2026-10-13": 3800.865, "2026-10-14": 3767.2271, "2026-10-15": 3707.4761, "2026-10-16": 3716.2839, "2026-10-19": 3730.9199, "2026-10-20": 3735.3701, "2026-10-21": 3713.0281, "2026-10-22": 3658.0259, "2026-10-23": 3690.4751, "2026-10-26": 3697.52, "2026-10-27": 3648.301, "2026-10-28": 3681.469, "2026-10-29": 3651.4341, "2026-10-30": 3599.0171, "2026-11-02": 3638.031}, "weekly": {"2025-11-03": 3997.5559, "2025-11-10": 3990.4919, "2025-11-17": 3834.8911, "2025-11-24": 3888.5959, "2025-12-01": 3902.8081, "2025-12-08": 3889.3459, "2025-12-15": 3890.448, "2025-12-22": 3963.679, "2025-12-29": 3968.8401, "2026-01-05": 4120.4258, "2026-01-12": 4101.9131, "2026-01-19": 4136.1641, "2026-01-26": 4117.9482, "2026-02-02": 4065.583, "2026-02-09": 4082.073, "2026-02-23": 4162.8809, "2026-03-02": 4124.1938, "2026-03-09": 4095.448, "2026-03-16": 3957.053, "2026-03-23": 3913.7241, "2026-03-30": 3880.0969, "2026-04-06": 3986.2251, "2026-04-13": 4051.425, "2026-04-20": 4079.8999, "2026-04-27": 4112.1592, "2026-05-04": 4179.9531, "2026-05-11": 4135.3892, "2026-05-18": 4112.8989, "2026-05-25": 4068.5691, "2026-06-01": 4027.7361, "2026-06-08": 4031.5129, "2026-06-15": 4090.481, "2026-06-22": 4027.2649, "2026-06-29": 4043.6431, "2026-07-06": 3996.1621, "2026-07-13": 3764.155, "2026-07-20": 3814.198, "2026-07-27": 3832.262, "2026-08-03": 3940.0371, "2026-08-10": 3927.177, "2026-08-17": 3905.2029, "2026-08-24": 3952.179, "2026-08-31": 3930.116, "2026-09-07": 3888.1111, "2026-09-14": 3911.8711, "2026-09-21": 3888.374, "2026-09-28": 3842.1951, "2026-10-05": 3813.791, "2026-10-12": 3716.2839, "2026-10-19": 3690.4751, "2026-10-26": 3599.0171, "2026-11-02": 3638.031}, "monthly": {"2025-11-01": 3888.5959, "2025-12-01": 3968.8401, "2026-01-01": 4117.9482, "2026-02-01": 4162.8809, "2026-03-01": 3891.8611, "2026-04-01": 4112.1592, "2026-05-01": 4068.5691, "2026-06-01": 4094.397, "2026-07-01": 3832.262, "2026-08-01": 3986.2981, "2026-09-01": 3842.1951, "2026-10-01": 3599.0171, "2026-11-01": 3638.031}, "inflections": [{"date": "2026-03-23", "value": 3813.283, "change_pct": -3.63}, {"date": "2026-07-17", "value": 3764.155, "change_pct": -3.05}, {"date": "2026-04-08", "value": 3994.998, "change_pct": 2.69}, {"date": "2026-02-02", "value": 4015.7461, "change_pct": -2.48}, {"date": "2025-11-21", "value": 3834.8911, "change_pct": -2.45}]}, "NIKKEI": {"group": "증시", "color": "#B03A5C", "daily": {"2025-11-04": 51497.1992, "2025-11-05": 50212.2695, "2025-11-06": 50883.6797, "2025-11-07": 50276.3711, "2025-11-10": 50911.7617, "2025-11-11": 50842.9297, "2025-11-12": 51063.3086, "2025-11-13": 51281.8281, "2025-11-14": 50376.5312, "2025-11-17": 50323.9102, "2025-11-18": 48702.9805, "2025-11-19": 48537.6992, "2025-11-20": 49823.9414, "2025-11-21": 48625.8789, "2025-11-25": 48659.5195, "2025-11-26": 49559.0703, "2025-11-27": 50167.1016, "2025-11-28": 50253.9102, "2025-12-01": 49303.2812, "2025-12-02": 49303.4492, "2025-12-03": 49864.6797, "2025-12-04": 51028.4219, "2025-12-05": 50491.8711, "2025-12-08": 50581.9414, "2025-12-09": 50655.1016, "2025-12-10": 50602.8008, "2025-12-11": 50148.8203, "2025-12-12": 50836.5508, "2025-12-15": 50168.1094, "2025-12-16": 49383.2891, "2025-12-17": 49512.2812, "2025-12-18": 49001.5, "2025-12-19": 49507.2109, "2025-12-22": 50402.3906, "2025-12-23": 50412.8711, "2025-12-24": 50344.1016, "2025-12-25": 50407.7891, "2025-12-26": 50750.3906, "2025-12-29": 50526.9219, "2025-12-30": 50339.4805, "2026-01-05": 51832.8008, "2026-01-06": 52518.0781, "2026-01-07": 51961.9805, "2026-01-08": 51117.2617, "2026-01-09": 51939.8906, "2026-01-13": 53549.1602, "2026-01-14": 54341.2305, "2026-01-15": 54110.5, "2026-01-16": 53936.1719, "2026-01-19": 53583.5703, "2026-01-20": 52991.1016, "2026-01-21": 52774.6406, "2026-01-22": 53688.8906, "2026-01-23": 53846.8711, "2026-01-26": 52885.25, "2026-01-27": 53333.5391, "2026-01-28": 53358.7109, "2026-01-29": 53375.6016, "2026-01-30": 53322.8516, "2026-02-02": 52655.1797, "2026-02-03": 54720.6602, "2026-02-04": 54293.3594, "2026-02-05": 53818.0391, "2026-02-06": 54253.6797, "2026-02-09": 56363.9414, "2026-02-10": 57650.5391, "2026-02-12": 57639.8398, "2026-02-13": 56941.9688, "2026-02-16": 56806.4102, "2026-02-17": 56566.4883, "2026-02-18": 57143.8398, "2026-02-19": 57467.8281, "2026-02-20": 56825.6992, "2026-02-24": 57321.0898, "2026-02-25": 58583.1211, "2026-02-26": 58753.3906, "2026-02-27": 58850.2695, "2026-03-02": 58057.2383, "2026-03-03": 56279.0508, "2026-03-04": 54245.5391, "2026-03-05": 55278.0586, "2026-03-06": 55620.8398, "2026-03-09": 52728.7188, "2026-03-10": 54248.3906, "2026-03-11": 55025.3711, "2026-03-12": 54452.9609, "2026-03-13": 53819.6094, "2026-03-16": 53751.1484, "2026-03-17": 53700.3906, "2026-03-18": 55239.3984, "2026-03-19": 53372.5312, "2026-03-23": 51515.4883, "2026-03-24": 52252.2812, "2026-03-25": 53749.6211, "2026-03-26": 53603.6484, "2026-03-27": 53373.0703, "2026-03-30": 51885.8516, "2026-03-31": 51063.7188, "2026-04-01": 53739.6797, "2026-04-02": 52463.2695, "2026-04-03": 53123.4883, "2026-04-06": 53413.6797, "2026-04-07": 53429.5586, "2026-04-08": 56308.4219, "2026-04-09": 55895.3203, "2026-04-10": 56924.1094, "2026-04-13": 56502.7695, "2026-04-14": 57877.3906, "2026-04-15": 58134.2383, "2026-04-16": 59518.3398, "2026-04-17": 58475.8984, "2026-04-20": 58824.8906, "2026-04-21": 59349.1719, "2026-04-22": 59585.8594, "2026-04-23": 59140.2305, "2026-04-24": 59716.1797, "2026-04-27": 60537.3594, "2026-04-28": 59917.4609, "2026-04-30": 59284.9219, "2026-05-01": 59513.1211, "2026-05-07": 62833.8398, "2026-05-08": 62713.6484, "2026-05-11": 62417.8789, "2026-05-12": 62742.5703, "2026-05-13": 63272.1094, "2026-05-14": 62654.0508, "2026-05-15": 61409.2891, "2026-05-18": 60815.9492, "2026-05-19": 60550.5898, "2026-05-20": 59804.4102, "2026-05-21": 61684.1406, "2026-05-22": 63339.0703, "2026-05-25": 65158.1914, "2026-05-26": 64996.0898, "2026-05-27": 64999.4102, "2026-05-28": 64693.1211, "2026-05-29": 66329.5, "2026-06-01": 66934.3281, "2026-06-02": 66734.2422, "2026-06-03": 68402.1328, "2026-06-04": 67470.6875, "2026-06-05": 66588.1172, "2026-06-08": 64024.6016, "2026-06-09": 65416.6289, "2026-06-10": 64179.2695, "2026-06-11": 64217.2695, "2026-06-12": 66020.0391, "2026-06-15": 69317.5, "2026-06-16": 69404.5, "2026-06-17": 69902.25, "2026-06-18": 71053.4922, "2026-06-19": 71250.0625, "2026-06-22": 72353.9609, "2026-06-23": 69788.3828, "2026-06-24": 69174.9688, "2026-06-25": 72366.3438, "2026-06-26": 69360.8828, "2026-06-29": 69468.1094, "2026-06-30": 70062.3203, "2026-07-01": 70474.9609, "2026-07-02": 68733.1484, "2026-07-03": 69744.0703, "2026-07-06": 69737.6875, "2026-07-07": 68256.9609, "2026-07-08": 66819.0469, "2026-07-09": 67743.8516, "2026-07-10": 68557.7266, "2026-07-13": 67242.7266, "2026-07-14": 67743.5, "2026-07-15": 68751.5078, "2026-07-16": 66835.5391, "2026-07-17": 64141.1211, "2026-07-21": 66232.1875, "2026-07-22": 66115.6016, "2026-07-23": 66422.6016, "2026-07-24": 64611.1484, "2026-07-27": 64931.1914, "2026-07-28": 62364.9219, "2026-07-29": 61434.1914, "2026-07-30": 61867.4297, "2026-07-31": 64362.0195, "2026-08-03": 63754.8984, "2026-08-04": 63957.5312, "2026-08-05": 66300.4375, "2026-08-06": 65683.2578, "2026-08-07": 65606.7109, "2026-08-10": 66970.2188, "2026-08-12": 67524.0625, "2026-08-13": 68308.5938, "2026-08-14": 68713.7969, "2026-08-17": 69220.25, "2026-08-18": 67460.7266, "2026-08-19": 65326.4219, "2026-08-20": 66216.7891, "2026-08-21": 66016.3594, "2026-08-24": 65528.0898, "2026-08-25": 65856.4297, "2026-08-26": 66262.1562, "2026-08-27": 66131.9766, "2026-08-28": 66405.5625, "2026-08-31": 66311.9297, "2026-09-01": 66215.3438, "2026-09-02": 64325.6406, "2026-09-03": 64214.4805, "2026-09-04": 65020.9414, "2026-09-07": 66399.8438, "2026-09-08": 65269.3281, "2026-09-09": 65142.7812, "2026-09-10": 65270.9492, "2026-09-11": 64011.3398, "2026-09-14": 63492.9883, "2026-09-15": 63484.1016, "2026-09-16": 63923.0, "2026-09-17": 64136.25, "2026-09-18": 65018.9492, "2026-09-24": 65513.9883, "2026-09-25": 66364.2031, "2026-09-28": 65877.6172, "2026-09-29": 65481.2695, "2026-09-30": 66753.7188, "2026-10-01": 68956.7188, "2026-10-02": 68309.4609, "2026-10-05": 69946.8594, "2026-10-06": 70683.9766, "2026-10-07": 70035.7109, "2026-10-08": 69042.1094, "2026-10-09": 69030.9219, "2026-10-13": 67777.5234, "2026-10-14": 67744.2891, "2026-10-15": 64425.9492, "2026-10-16": 65324.2891, "2026-10-19": 64916.6992, "2026-10-20": 64075.4219, "2026-10-21": 64621.2383, "2026-10-22": 62907.8398, "2026-10-23": 62693.1602, "2026-10-26": 62189.6484, "2026-10-27": 63268.3711, "2026-10-28": 63954.1914, "2026-10-29": 64659.4688, "2026-10-30": 63290.1094, "2026-11-02": 63081.8594}, "weekly": {"2025-11-03": 50276.3711, "2025-11-10": 50376.5312, "2025-11-17": 48625.8789, "2025-11-24": 50253.9102, "2025-12-01": 50491.8711, "2025-12-08": 50836.5508, "2025-12-15": 49507.2109, "2025-12-22": 50750.3906, "2025-12-29": 50339.4805, "2026-01-05": 51939.8906, "2026-01-12": 53936.1719, "2026-01-19": 53846.8711, "2026-01-26": 53322.8516, "2026-02-02": 54253.6797, "2026-02-09": 56941.9688, "2026-02-16": 56825.6992, "2026-02-23": 58850.2695, "2026-03-02": 55620.8398, "2026-03-09": 53819.6094, "2026-03-16": 53372.5312, "2026-03-23": 53373.0703, "2026-03-30": 53123.4883, "2026-04-06": 56924.1094, "2026-04-13": 58475.8984, "2026-04-20": 59716.1797, "2026-04-27": 59513.1211, "2026-05-04": 62713.6484, "2026-05-11": 61409.2891, "2026-05-18": 63339.0703, "2026-05-25": 66329.5, "2026-06-01": 66588.1172, "2026-06-08": 66020.0391, "2026-06-15": 71250.0625, "2026-06-22": 69360.8828, "2026-06-29": 69744.0703, "2026-07-06": 68557.7266, "2026-07-13": 64141.1211, "2026-07-20": 64611.1484, "2026-07-27": 64362.0195, "2026-08-03": 65606.7109, "2026-08-10": 68713.7969, "2026-08-17": 66016.3594, "2026-08-24": 66405.5625, "2026-08-31": 65020.9414, "2026-09-07": 64011.3398, "2026-09-14": 65018.9492, "2026-09-21": 66364.2031, "2026-09-28": 68309.4609, "2026-10-05": 69030.9219, "2026-10-12": 65324.2891, "2026-10-19": 62693.1602, "2026-10-26": 63290.1094, "2026-11-02": 63081.8594}, "monthly": {"2025-11-01": 50253.9102, "2025-12-01": 50339.4805, "2026-01-01": 53322.8516, "2026-02-01": 58850.2695, "2026-03-01": 51063.7188, "2026-04-01": 59284.9219, "2026-05-01": 66329.5, "2026-06-01": 70062.3203, "2026-07-01": 64362.0195, "2026-08-01": 66311.9297, "2026-09-01": 66753.7188, "2026-10-01": 63290.1094, "2026-11-01": 63081.8594}, "inflections": [{"date": "2026-05-07", "value": 62833.8398, "change_pct": 5.58}, {"date": "2026-04-08", "value": 56308.4219, "change_pct": 5.39}, {"date": "2026-04-01", "value": 53739.6797, "change_pct": 5.24}, {"date": "2026-03-09", "value": 52728.7188, "change_pct": -5.2}, {"date": "2026-06-15", "value": 69317.5, "change_pct": 4.99}]}, "USD/KRW": {"group": "환율", "color": "#2F43A6", "daily": {"2025-11-03": 1427.17, "2025-11-04": 1428.97, "2025-11-05": 1439.8101, "2025-11-06": 1439.74, "2025-11-07": 1447.9, "2025-11-10": 1454.0, "2025-11-11": 1456.09, "2025-11-12": 1459.84, "2025-11-13": 1468.02, "2025-11-14": 1468.71, "2025-11-17": 1446.53, "2025-11-18": 1461.6899, "2025-11-19": 1456.55, "2025-11-20": 1466.13, "2025-11-21": 1473.25, "2025-11-24": 1467.73, "2025-11-25": 1474.86, "2025-11-26": 1464.92, "2025-11-27": 1470.59, "2025-11-28": 1461.4, "2025-12-01": 1465.62, "2025-12-02": 1470.17, "2025-12-03": 1467.36, "2025-12-04": 1465.03, "2025-12-05": 1472.38, "2025-12-08": 1471.8101, "2025-12-09": 1468.51, "2025-12-10": 1467.9301, "2025-12-11": 1469.04, "2025-12-12": 1470.85, "2025-12-15": 1472.91, "2025-12-16": 1467.48, "2025-12-17": 1471.74, "2025-12-18": 1474.0, "2025-12-19": 1474.36, "2025-12-22": 1473.72, "2025-12-23": 1476.84, "2025-12-24": 1478.67, "2025-12-26": 1446.52, "2025-12-29": 1441.33, "2025-12-30": 1434.71, "2025-12-31": 1437.91, "2026-01-02": 1443.64, "2026-01-05": 1440.48, "2026-01-06": 1445.5601, "2026-01-07": 1444.96, "2026-01-08": 1446.14, "2026-01-09": 1450.08, "2026-01-12": 1455.24, "2026-01-13": 1464.9301, "2026-01-14": 1473.01, "2026-01-15": 1462.9, "2026-01-16": 1468.84, "2026-01-19": 1471.58, "2026-01-20": 1471.52, "2026-01-21": 1477.78, "2026-01-22": 1464.83, "2026-01-23": 1463.26, "2026-01-26": 1444.8101, "2026-01-27": 1440.98, "2026-01-28": 1432.51, "2026-01-29": 1429.27, "2026-01-30": 1428.76, "2026-02-02": 1448.8, "2026-02-03": 1452.54, "2026-02-04": 1446.6801, "2026-02-05": 1460.11, "2026-02-06": 1470.6801, "2026-02-09": 1462.4, "2026-02-10": 1458.54, "2026-02-11": 1455.33, "2026-02-12": 1444.1899, "2026-02-13": 1440.9, "2026-02-16": 1439.52, "2026-02-17": 1440.23, "2026-02-18": 1439.97, "2026-02-19": 1440.16, "2026-02-20": 1447.75, "2026-02-23": 1443.4399, "2026-02-24": 1442.2, "2026-02-25": 1439.99, "2026-02-26": 1426.9301, "2026-02-27": 1432.3199, "2026-03-02": 1438.5, "2026-03-03": 1452.27, "2026-03-04": 1483.0699, "2026-03-05": 1460.75, "2026-03-06": 1479.51, "2026-03-09": 1483.89, "2026-03-10": 1464.47, "2026-03-11": 1472.78, "2026-03-12": 1475.34, "2026-03-13": 1470.58, "2026-03-16": 1501.75, "2026-03-17": 1488.91, "2026-03-18": 1484.87, "2026-03-19": 1505.25, "2026-03-20": 1489.84, "2026-03-23": 1504.21, "2026-03-24": 1485.36, "2026-03-25": 1497.3101, "2026-03-26": 1500.97, "2026-03-27": 1508.36, "2026-03-30": 1507.02, "2026-03-31": 1516.13, "2026-04-01": 1503.33, "2026-04-02": 1512.09, "2026-04-03": 1509.22, "2026-04-06": 1509.26, "2026-04-07": 1507.85, "2026-04-08": 1499.13, "2026-04-09": 1477.6, "2026-04-10": 1473.28, "2026-04-13": 1482.1801, "2026-04-14": 1476.84, "2026-04-15": 1469.42, "2026-04-16": 1474.0601, "2026-04-17": 1477.92, "2026-04-20": 1465.15, "2026-04-21": 1469.26, "2026-04-22": 1485.8, "2026-04-23": 1477.96, "2026-04-24": 1479.95, "2026-04-27": 1474.6899, "2026-04-28": 1473.0, "2026-04-29": 1471.99, "2026-04-30": 1487.38, "2026-05-01": 1474.01, "2026-05-04": 1471.73, "2026-05-05": 1476.05, "2026-05-06": 1473.96, "2026-05-07": 1444.45, "2026-05-08": 1454.79, "2026-05-11": 1460.55, "2026-05-12": 1474.45, "2026-05-13": 1492.99, "2026-05-14": 1489.84, "2026-05-15": 1493.34, "2026-05-18": 1497.15, "2026-05-19": 1492.3199, "2026-05-20": 1507.85, "2026-05-21": 1499.77, "2026-05-22": 1504.4, "2026-05-25": 1512.83, "2026-05-26": 1514.79, "2026-05-27": 1505.4399, "2026-05-28": 1503.11, "2026-05-29": 1495.29, "2026-06-01": 1506.84, "2026-06-02": 1511.27, "2026-06-03": 1516.6, "2026-06-04": 1530.11, "2026-06-05": 1533.0699, "2026-06-08": 1554.48, "2026-06-09": 1528.88, "2026-06-10": 1525.8101, "2026-06-11": 1525.05, "2026-06-12": 1517.38, "2026-06-15": 1509.5, "2026-06-16": 1513.3101, "2026-06-17": 1510.96, "2026-06-18": 1525.42, "2026-06-19": 1537.5601, "2026-06-22": 1531.33, "2026-06-23": 1539.05, "2026-06-24": 1535.25, "2026-06-25": 1542.76, "2026-06-26": 1546.48, "2026-06-29": 1535.24, "2026-06-30": 1541.73, "2026-07-01": 1548.61, "2026-07-02": 1551.8101, "2026-07-03": 1542.13, "2026-07-06": 1531.0, "2026-07-07": 1528.76, "2026-07-08": 1519.86, "2026-07-09": 1503.35, "2026-07-10": 1505.91, "2026-07-13": 1498.48, "2026-07-14": 1497.7, "2026-07-15": 1487.88, "2026-07-16": 1486.2, "2026-07-17": 1478.85, "2026-07-20": 1487.39, "2026-07-21": 1475.01, "2026-07-22": 1479.72, "2026-07-23": 1475.63, "2026-07-24": 1474.04, "2026-07-27": 1458.01, "2026-07-28": 1464.4399, "2026-07-29": 1453.16, "2026-07-30": 1442.28, "2026-07-31": 1420.6, "2026-08-03": 1435.7, "2026-08-04": 1428.5, "2026-08-05": 1428.4301, "2026-08-06": 1421.16, "2026-08-07": 1422.3, "2026-08-10": 1407.0, "2026-08-11": 1417.3101, "2026-08-12": 1412.1801, "2026-08-13": 1416.46, "2026-08-14": 1416.85, "2026-08-17": 1415.37, "2026-08-18": 1414.73, "2026-08-19": 1413.58, "2026-08-20": 1389.4, "2026-08-21": 1390.79, "2026-08-24": 1384.98, "2026-08-25": 1380.76, "2026-08-26": 1381.49, "2026-08-27": 1383.49, "2026-08-28": 1380.45, "2026-08-31": 1377.11, "2026-09-01": 1366.62, "2026-09-02": 1372.86, "2026-09-03": 1358.39, "2026-09-04": 1355.41, "2026-09-07": 1345.0601, "2026-09-08": 1343.5699, "2026-09-09": 1339.21, "2026-09-10": 1339.17, "2026-09-11": 1348.17, "2026-09-14": 1344.64, "2026-09-15": 1345.61, "2026-09-16": 1363.5699, "2026-09-17": 1376.6, "2026-09-18": 1379.53, "2026-09-21": 1384.86, "2026-09-22": 1373.6801, "2026-09-23": 1350.36, "2026-09-24": 1362.5, "2026-09-25": 1367.36, "2026-09-28": 1354.51, "2026-09-29": 1359.5601, "2026-09-30": 1350.5, "2026-10-01": 1356.84, "2026-10-02": 1360.59, "2026-10-05": 1342.5601, "2026-10-06": 1343.75, "2026-10-07": 1339.74, "2026-10-08": 1339.08, "2026-10-09": 1342.99, "2026-10-12": 1340.84, "2026-10-13": 1334.13, "2026-10-14": 1340.3101, "2026-10-15": 1339.35, "2026-10-16": 1340.95, "2026-10-19": 1333.4301, "2026-10-20": 1330.0, "2026-10-21": 1323.9399, "2026-10-22": 1325.59, "2026-10-23": 1325.99, "2026-10-26": 1321.76, "2026-10-27": 1324.77, "2026-10-28": 1326.8101, "2026-10-29": 1340.34, "2026-10-30": 1337.98, "2026-11-02": 1325.52, "2026-11-03": 1339.1899}, "weekly": {"2025-11-03": 1447.9, "2025-11-10": 1468.71, "2025-11-17": 1473.25, "2025-11-24": 1461.4, "2025-12-01": 1472.38, "2025-12-08": 1470.85, "2025-12-15": 1474.36, "2025-12-22": 1446.52, "2025-12-29": 1443.64, "2026-01-05": 1450.08, "2026-01-12": 1468.84, "2026-01-19": 1463.26, "2026-01-26": 1428.76, "2026-02-02": 1470.6801, "2026-02-09": 1440.9, "2026-02-16": 1447.75, "2026-02-23": 1432.3199, "2026-03-02": 1479.51, "2026-03-09": 1470.58, "2026-03-16": 1489.84, "2026-03-23": 1508.36, "2026-03-30": 1509.22, "2026-04-06": 1473.28, "2026-04-13": 1477.92, "2026-04-20": 1479.95, "2026-04-27": 1474.01, "2026-05-04": 1454.79, "2026-05-11": 1493.34, "2026-05-18": 1504.4, "2026-05-25": 1495.29, "2026-06-01": 1533.0699, "2026-06-08": 1517.38, "2026-06-15": 1537.5601, "2026-06-22": 1546.48, "2026-06-29": 1542.13, "2026-07-06": 1505.91, "2026-07-13": 1478.85, "2026-07-20": 1474.04, "2026-07-27": 1420.6, "2026-08-03": 1422.3, "2026-08-10": 1416.85, "2026-08-17": 1390.79, "2026-08-24": 1380.45, "2026-08-31": 1355.41, "2026-09-07": 1348.17, "2026-09-14": 1379.53, "2026-09-21": 1367.36, "2026-09-28": 1360.59, "2026-10-05": 1342.99, "2026-10-12": 1340.95, "2026-10-19": 1325.99, "2026-10-26": 1337.98, "2026-11-02": 1339.1899}, "monthly": {"2025-11-01": 1461.4, "2025-12-01": 1437.91, "2026-01-01": 1428.76, "2026-02-01": 1432.3199, "2026-03-01": 1516.13, "2026-04-01": 1487.38, "2026-05-01": 1495.29, "2026-06-01": 1541.73, "2026-07-01": 1420.6, "2026-08-01": 1377.11, "2026-09-01": 1350.5, "2026-10-01": 1337.98, "2026-11-01": 1339.1899}, "inflections": [{"date": "2025-12-26", "value": 1446.52, "change_pct": -2.17}, {"date": "2026-03-04", "value": 1483.0699, "change_pct": 2.12}, {"date": "2026-03-16", "value": 1501.75, "change_pct": 2.12}, {"date": "2026-05-07", "value": 1444.45, "change_pct": -2.0}, {"date": "2026-08-20", "value": 1389.4, "change_pct": -1.71}]}, "EUR/KRW": {"group": "환율", "color": "#117A6B", "daily": {"2025-11-03": 1646.46, "2025-11-04": 1645.72, "2025-11-05": 1653.05, "2025-11-06": 1654.26, "2025-11-07": 1671.6899, "2025-11-10": 1669.09, "2025-11-11": 1682.84, "2025-11-12": 1690.86, "2025-11-13": 1700.9399, "2025-11-14": 1707.99, "2025-11-17": 1674.89, "2025-11-18": 1694.24, "2025-11-19": 1686.46, "2025-11-20": 1691.4, "2025-11-21": 1698.24, "2025-11-24": 1690.39, "2025-11-25": 1699.4, "2025-11-26": 1694.59, "2025-11-27": 1705.23, "2025-11-28": 1694.25, "2025-12-01": 1693.46, "2025-12-02": 1706.52, "2025-12-03": 1705.4301, "2025-12-04": 1709.6801, "2025-12-05": 1714.21, "2025-12-08": 1711.8101, "2025-12-09": 1709.05, "2025-12-10": 1706.36, "2025-12-11": 1717.99, "2025-12-12": 1726.0699, "2025-12-15": 1722.61, "2025-12-16": 1724.27, "2025-12-17": 1728.9399, "2025-12-18": 1730.16, "2025-12-19": 1729.0, "2025-12-22": 1730.78, "2025-12-23": 1736.46, "2025-12-24": 1743.59, "2025-12-26": 1699.55, "2025-12-29": 1703.38, "2025-12-30": 1688.46, "2025-12-31": 1688.99, "2026-01-02": 1691.49, "2026-01-05": 1693.42, "2026-01-06": 1694.0, "2026-01-07": 1688.71, "2026-01-08": 1688.64, "2026-01-09": 1690.29, "2026-01-12": 1700.13, "2026-01-13": 1708.73, "2026-01-14": 1715.0601, "2026-01-15": 1703.25, "2026-01-16": 1704.6, "2026-01-19": 1703.59, "2026-01-20": 1713.24, "2026-01-21": 1732.22, "2026-01-22": 1710.76, "2026-01-23": 1719.9301, "2026-01-26": 1707.61, "2026-01-27": 1711.54, "2026-01-28": 1723.52, "2026-01-29": 1711.5, "2026-01-30": 1709.7, "2026-02-02": 1726.8, "2026-02-03": 1712.3101, "2026-02-04": 1709.0601, "2026-02-05": 1722.91, "2026-02-06": 1732.33, "2026-02-09": 1726.29, "2026-02-10": 1737.08, "2026-02-11": 1729.83, "2026-02-12": 1714.51, "2026-02-13": 1710.4301, "2026-02-16": 1687.25, "2026-02-17": 1705.98, "2026-02-18": 1706.52, "2026-02-19": 1696.98, "2026-02-20": 1703.74, "2026-02-23": 1700.9399, "2026-02-24": 1699.5, "2026-02-25": 1695.24, "2026-02-26": 1685.37, "2026-02-27": 1689.54, "2026-03-02": 1696.66, "2026-03-03": 1698.17, "2026-03-04": 1723.4, "2026-03-05": 1699.49, "2026-03-06": 1717.59, "2026-03-09": 1710.89, "2026-03-10": 1702.2, "2026-03-11": 1709.64, "2026-03-12": 1703.5699, "2026-03-13": 1713.39, "2026-03-16": 1713.86, "2026-03-17": 1712.23, "2026-03-18": 1713.12, "2026-03-19": 1724.4301, "2026-03-20": 1728.95, "2026-03-23": 1740.16, "2026-03-24": 1724.58, "2026-03-25": 1739.47, "2026-03-26": 1735.1899, "2026-03-27": 1740.05, "2026-03-30": 1736.71, "2026-03-31": 1736.26, "2026-04-01": 1738.51, "2026-04-02": 1752.59, "2026-04-03": 1741.09, "2026-04-06": 1741.24, "2026-04-07": 1741.25, "2026-04-08": 1752.0, "2026-04-09": 1723.01, "2026-04-10": 1722.61, "2026-04-13": 1741.02, "2026-04-14": 1736.64, "2026-04-15": 1732.9301, "2026-04-16": 1739.41, "2026-04-17": 1740.84, "2026-04-20": 1731.1801, "2026-04-21": 1731.72, "2026-04-22": 1743.92, "2026-04-23": 1729.71, "2026-04-24": 1729.1899, "2026-04-27": 1728.02, "2026-04-28": 1726.37, "2026-04-29": 1724.36, "2026-04-30": 1736.6, "2026-05-01": 1727.91, "2026-05-04": 1727.41, "2026-05-05": 1725.15, "2026-05-06": 1727.37, "2026-05-07": 1697.04, "2026-05-08": 1705.33, "2026-05-11": 1723.67, "2026-05-12": 1737.5, "2026-05-13": 1750.42, "2026-05-14": 1743.55, "2026-05-15": 1740.22, "2026-05-18": 1737.86, "2026-05-19": 1733.8101, "2026-05-20": 1748.02, "2026-05-21": 1738.48, "2026-05-22": 1750.15, "2026-05-25": 1769.41, "2026-05-26": 1765.2, "2026-05-27": 1753.01, "2026-05-28": 1743.16, "2026-05-29": 1739.14, "2026-06-01": 1755.9, "2026-06-02": 1757.34, "2026-06-03": 1760.05, "2026-06-04": 1776.74, "2026-06-05": 1778.12, "2026-06-08": 1807.42, "2026-06-09": 1759.71, "2026-06-10": 1761.1, "2026-06-11": 1751.95, "2026-06-12": 1754.26, "2026-06-15": 1754.61, "2026-06-16": 1753.9301, "2026-06-17": 1755.65, "2026-06-18": 1755.9, "2026-06-19": 1759.48, "2026-06-22": 1703.52, "2026-06-23": 1752.54, "2026-06-24": 1740.5699, "2026-06-25": 1747.22, "2026-06-26": 1754.1801, "2026-06-29": 1746.09, "2026-06-30": 1760.27, "2026-07-01": 1763.6801, "2026-07-02": 1765.89, "2026-07-03": 1755.52, "2026-07-06": 1746.86, "2026-07-07": 1748.3101, "2026-07-08": 1726.58, "2026-07-09": 1717.23, "2026-07-10": 1720.08, "2026-07-13": 1669.09, "2026-07-14": 1703.85, "2026-07-15": 1698.0, "2026-07-16": 1707.87, "2026-07-17": 1692.64, "2026-07-20": 1700.58, "2026-07-21": 1683.36, "2026-07-22": 1687.03, "2026-07-23": 1683.6, "2026-07-24": 1676.49, "2026-07-27": 1657.74, "2026-07-28": 1665.16, "2026-07-29": 1654.4301, "2026-07-30": 1652.79, "2026-07-31": 1636.6801, "2026-08-03": 1663.51, "2026-08-04": 1643.36, "2026-08-05": 1647.17, "2026-08-06": 1642.01, "2026-08-07": 1638.8199, "2026-08-10": 1618.62, "2026-08-11": 1635.36, "2026-08-12": 1628.62, "2026-08-13": 1632.86, "2026-08-14": 1634.1899, "2026-08-17": 1582.09, "2026-08-18": 1638.16, "2026-08-19": 1634.92, "2026-08-20": 1620.23, "2026-08-21": 1626.37, "2026-08-24": 1616.97, "2026-08-25": 1610.77, "2026-08-26": 1611.99, "2026-08-27": 1612.38, "2026-08-28": 1607.13, "2026-08-31": 1579.97, "2026-09-01": 1587.47, "2026-09-02": 1592.22, "2026-09-03": 1573.29, "2026-09-04": 1575.39, "2026-09-07": 1559.22, "2026-09-08": 1562.45, "2026-09-09": 1556.73, "2026-09-10": 1557.39, "2026-09-11": 1565.09, "2026-09-14": 1556.39, "2026-09-15": 1555.1899, "2026-09-16": 1572.95, "2026-09-17": 1578.54, "2026-09-18": 1582.8101, "2026-09-21": 1593.0, "2026-09-22": 1573.83, "2026-09-23": 1548.51, "2026-09-24": 1552.71, "2026-09-25": 1555.87, "2026-09-28": 1545.78, "2026-09-29": 1544.98, "2026-09-30": 1531.4301, "2026-10-01": 1536.13, "2026-10-02": 1528.21, "2026-10-05": 1507.8101, "2026-10-06": 1506.39, "2026-10-07": 1506.13, "2026-10-08": 1499.4, "2026-10-09": 1503.66, "2026-10-12": 1502.28, "2026-10-13": 1488.11, "2026-10-14": 1499.92, "2026-10-15": 1499.15, "2026-10-16": 1501.45, "2026-10-19": 1498.22, "2026-10-20": 1490.66, "2026-10-21": 1485.7, "2026-10-22": 1489.13, "2026-10-23": 1485.48, "2026-10-26": 1475.7, "2026-10-27": 1478.76, "2026-10-28": 1474.64, "2026-10-29": 1494.46, "2026-10-30": 1495.9, "2026-11-02": 1486.41, "2026-11-03": 1498.1}, "weekly": {"2025-11-03": 1671.6899, "2025-11-10": 1707.99, "2025-11-17": 1698.24, "2025-11-24": 1694.25, "2025-12-01": 1714.21, "2025-12-08": 1726.0699, "2025-12-15": 1729.0, "2025-12-22": 1699.55, "2025-12-29": 1691.49, "2026-01-05": 1690.29, "2026-01-12": 1704.6, "2026-01-19": 1719.9301, "2026-01-26": 1709.7, "2026-02-02": 1732.33, "2026-02-09": 1710.4301, "2026-02-16": 1703.74, "2026-02-23": 1689.54, "2026-03-02": 1717.59, "2026-03-09": 1713.39, "2026-03-16": 1728.95, "2026-03-23": 1740.05, "2026-03-30": 1741.09, "2026-04-06": 1722.61, "2026-04-13": 1740.84, "2026-04-20": 1729.1899, "2026-04-27": 1727.91, "2026-05-04": 1705.33, "2026-05-11": 1740.22, "2026-05-18": 1750.15, "2026-05-25": 1739.14, "2026-06-01": 1778.12, "2026-06-08": 1754.26, "2026-06-15": 1759.48, "2026-06-22": 1754.1801, "2026-06-29": 1755.52, "2026-07-06": 1720.08, "2026-07-13": 1692.64, "2026-07-20": 1676.49, "2026-07-27": 1636.6801, "2026-08-03": 1638.8199, "2026-08-10": 1634.1899, "2026-08-17": 1626.37, "2026-08-24": 1607.13, "2026-08-31": 1575.39, "2026-09-07": 1565.09, "2026-09-14": 1582.8101, "2026-09-21": 1555.87, "2026-09-28": 1528.21, "2026-10-05": 1503.66, "2026-10-12": 1501.45, "2026-10-19": 1485.48, "2026-10-26": 1495.9, "2026-11-02": 1498.1}, "monthly": {"2025-11-01": 1694.25, "2025-12-01": 1688.99, "2026-01-01": 1709.7, "2026-02-01": 1689.54, "2026-03-01": 1736.26, "2026-04-01": 1736.6, "2026-05-01": 1739.14, "2026-06-01": 1760.27, "2026-07-01": 1636.6801, "2026-08-01": 1579.97, "2026-09-01": 1531.4301, "2026-10-01": 1495.9, "2026-11-01": 1498.1}, "inflections": [{"date": "2026-08-18", "value": 1638.16, "change_pct": 3.54}, {"date": "2026-08-17", "value": 1582.09, "change_pct": -3.19}, {"date": "2026-06-22", "value": 1703.52, "change_pct": -3.18}, {"date": "2026-07-13", "value": 1669.09, "change_pct": -2.96}, {"date": "2026-06-23", "value": 1752.54, "change_pct": 2.88}]}, "CNY/KRW": {"group": "환율", "color": "#7B3A8C", "daily": {"2026-11-03": 200.795}, "weekly": {"2026-11-02": 200.795}, "monthly": {"2026-11-01": 200.795}, "inflections": []}, "JPY100/KRW": {"group": "환율", "color": "#B03A5C", "daily": {"2025-11-03": 927.34, "2025-11-04": 926.62, "2025-11-05": 937.64, "2025-11-06": 934.48, "2025-11-07": 946.55, "2025-11-10": 945.19, "2025-11-11": 944.57, "2025-11-12": 947.43, "2025-11-13": 948.81, "2025-11-14": 949.76, "2025-11-17": 935.62, "2025-11-18": 941.38, "2025-11-19": 936.4, "2025-11-20": 933.89, "2025-11-21": 936.25, "2025-11-24": 936.66, "2025-11-25": 939.84, "2025-11-26": 937.18, "2025-11-27": 941.16, "2025-11-28": 935.03, "2025-12-01": 939.97, "2025-12-02": 945.06, "2025-12-03": 941.79, "2025-12-04": 944.62, "2025-12-05": 949.09, "2025-12-08": 947.36, "2025-12-09": 942.24, "2025-12-10": 935.99, "2025-12-11": 942.91, "2025-12-12": 945.42, "2025-12-15": 944.85, "2025-12-16": 946.61, "2025-12-17": 950.84, "2025-12-18": 947.95, "2025-12-19": 947.49, "2025-12-22": 934.58, "2025-12-23": 941.28, "2025-12-24": 946.87, "2025-12-26": 926.67, "2025-12-29": 923.71, "2025-12-30": 918.91, "2025-12-31": 919.35, "2026-01-02": 896.14, "2026-01-05": 917.51, "2026-01-06": 922.9, "2026-01-07": 922.19, "2026-01-08": 922.69, "2026-01-09": 924.29, "2026-01-12": 920.13, "2026-01-13": 927.21, "2026-01-14": 925.36, "2026-01-15": 923.48, "2026-01-16": 926.09, "2026-01-19": 934.06, "2026-01-20": 930.23, "2026-01-21": 934.43, "2026-01-22": 924.71, "2026-01-23": 923.27, "2026-01-26": 930.7, "2026-01-27": 933.65, "2026-01-28": 939.62, "2026-01-29": 933.65, "2026-01-30": 932.81, "2026-02-02": 933.32, "2026-02-03": 934.66, "2026-02-04": 928.57, "2026-02-05": 930.54, "2026-02-06": 938.11, "2026-02-09": 929.44, "2026-02-10": 934.12, "2026-02-11": 942.03, "2026-02-12": 942.25, "2026-02-13": 942.64, "2026-02-16": 941.52, "2026-02-17": 937.52, "2026-02-18": 940.06, "2026-02-19": 930.91, "2026-02-20": 933.03, "2026-02-23": 935.69, "2026-02-24": 932.48, "2026-02-25": 923.75, "2026-02-26": 913.47, "2026-02-27": 919.07, "2026-03-02": 917.9, "2026-03-03": 923.49, "2026-03-04": 940.06, "2026-03-05": 930.57, "2026-03-06": 939.27, "2026-03-09": 935.91, "2026-03-10": 928.04, "2026-03-11": 931.35, "2026-03-12": 927.75, "2026-03-13": 934.5, "2026-03-16": 941.48, "2026-03-17": 936.09, "2026-03-18": 933.85, "2026-03-19": 942.25, "2026-03-20": 943.38, "2026-03-23": 944.75, "2026-03-24": 936.6, "2026-03-25": 942.86, "2026-03-26": 941.75, "2026-03-27": 944.39, "2026-03-30": 940.46, "2026-03-31": 948.49, "2026-04-01": 948.0, "2026-04-02": 952.72, "2026-04-03": 946.24, "2026-04-06": 944.53, "2026-04-07": 944.19, "2026-04-08": 944.46, "2026-04-09": 931.33, "2026-04-10": 925.93, "2026-04-13": 928.13, "2026-04-14": 927.59, "2026-04-15": 925.32, "2026-04-16": 928.13, "2026-04-17": 928.33, "2026-04-20": 920.52, "2026-04-21": 924.9, "2026-04-22": 932.28, "2026-04-23": 926.69, "2026-04-24": 926.29, "2026-04-27": 924.07, "2026-04-28": 924.28, "2026-04-29": 922.58, "2026-04-30": 928.5, "2026-05-01": 938.93, "2026-05-04": 938.27, "2026-05-05": 938.98, "2026-05-06": 934.63, "2026-05-07": 922.99, "2026-05-08": 927.56, "2026-05-11": 931.02, "2026-05-12": 937.11, "2026-05-13": 947.08, "2026-05-14": 943.72, "2026-05-15": 943.18, "2026-05-18": 942.63, "2026-05-19": 939.03, "2026-05-20": 948.05, "2026-05-21": 944.07, "2026-05-22": 945.55, "2026-05-25": 951.72, "2026-05-26": 952.94, "2026-05-27": 945.74, "2026-05-28": 941.47, "2026-05-29": 938.31, "2026-06-01": 945.54, "2026-06-02": 946.58, "2026-06-03": 948.05, "2026-06-04": 956.56, "2026-06-05": 957.99, "2026-06-08": 969.32, "2026-06-09": 954.26, "2026-06-10": 951.3, "2026-06-11": 949.98, "2026-06-12": 947.86, "2026-06-15": 943.68, "2026-06-16": 943.0, "2026-06-17": 941.84, "2026-06-18": 949.99, "2026-06-19": 953.14, "2026-06-22": 948.54, "2026-06-23": 952.48, "2026-06-24": 950.05, "2026-06-25": 953.77, "2026-06-26": 955.69, "2026-06-29": 948.53, "2026-06-30": 952.05, "2026-07-01": 952.15, "2026-07-02": 955.36, "2026-07-03": 956.16, "2026-07-06": 947.78, "2026-07-07": 942.84, "2026-07-08": 936.23, "2026-07-09": 924.95, "2026-07-10": 927.49, "2026-07-13": 925.72, "2026-07-14": 922.03, "2026-07-15": 917.56, "2026-07-16": 917.21, "2026-07-17": 910.64, "2026-07-20": 915.19, "2026-07-21": 907.75, "2026-07-22": 906.75, "2026-07-23": 904.75, "2026-07-24": 899.71, "2026-07-27": 891.09, "2026-07-28": 894.16, "2026-07-29": 886.79, "2026-07-30": 883.13, "2026-07-31": 886.78, "2026-08-03": 910.86, "2026-08-04": 906.69, "2026-08-05": 905.69, "2026-08-06": 901.55, "2026-08-07": 897.9, "2026-08-10": 891.19, "2026-08-11": 890.49, "2026-08-12": 886.64, "2026-08-13": 888.88, "2026-08-14": 888.68, "2026-08-17": 888.91, "2026-08-18": 887.91, "2026-08-19": 885.89, "2026-08-20": 877.82, "2026-08-21": 875.46, "2026-08-24": 871.49, "2026-08-25": 867.66, "2026-08-26": 867.17, "2026-08-27": 868.76, "2026-08-28": 866.49, "2026-08-31": 860.06, "2026-09-01": 855.45, "2026-09-02": 856.51, "2026-09-03": 854.7, "2026-09-04": 870.78, "2026-09-07": 861.2, "2026-09-08": 873.24, "2026-09-09": 872.59, "2026-09-10": 871.78, "2026-09-11": 872.73, "2026-09-14": 876.23, "2026-09-15": 871.28, "2026-09-16": 877.99, "2026-09-17": 882.29, "2026-09-18": 883.53, "2026-09-21": 881.8, "2026-09-22": 872.72, "2026-09-23": 857.5, "2026-09-24": 861.58, "2026-09-25": 861.59, "2026-09-28": 860.23, "2026-09-29": 863.46, "2026-09-30": 858.31, "2026-10-01": 861.1, "2026-10-02": 861.46, "2026-10-05": 851.14, "2026-10-06": 850.77, "2026-10-07": 846.32, "2026-10-08": 847.74, "2026-10-09": 849.54, "2026-10-12": 847.53, "2026-10-13": 841.41, "2026-10-14": 846.53, "2026-10-15": 848.05, "2026-10-16": 847.74, "2026-10-19": 844.98, "2026-10-20": 839.08, "2026-10-21": 835.97, "2026-10-22": 838.22, "2026-10-23": 847.31, "2026-10-26": 842.76, "2026-10-27": 840.92, "2026-10-28": 839.77, "2026-10-29": 849.29, "2026-10-30": 847.34, "2026-11-02": 845.01, "2026-11-03": 846.0}, "weekly": {"2025-11-03": 946.55, "2025-11-10": 949.76, "2025-11-17": 936.25, "2025-11-24": 935.03, "2025-12-01": 949.09, "2025-12-08": 945.42, "2025-12-15": 947.49, "2025-12-22": 926.67, "2025-12-29": 896.14, "2026-01-05": 924.29, "2026-01-12": 926.09, "2026-01-19": 923.27, "2026-01-26": 932.81, "2026-02-02": 938.11, "2026-02-09": 942.64, "2026-02-16": 933.03, "2026-02-23": 919.07, "2026-03-02": 939.27, "2026-03-09": 934.5, "2026-03-16": 943.38, "2026-03-23": 944.39, "2026-03-30": 946.24, "2026-04-06": 925.93, "2026-04-13": 928.33, "2026-04-20": 926.29, "2026-04-27": 938.93, "2026-05-04": 927.56, "2026-05-11": 943.18, "2026-05-18": 945.55, "2026-05-25": 938.31, "2026-06-01": 957.99, "2026-06-08": 947.86, "2026-06-15": 953.14, "2026-06-22": 955.69, "2026-06-29": 956.16, "2026-07-06": 927.49, "2026-07-13": 910.64, "2026-07-20": 899.71, "2026-07-27": 886.78, "2026-08-03": 897.9, "2026-08-10": 888.68, "2026-08-17": 875.46, "2026-08-24": 866.49, "2026-08-31": 870.78, "2026-09-07": 872.73, "2026-09-14": 883.53, "2026-09-21": 861.59, "2026-09-28": 861.46, "2026-10-05": 849.54, "2026-10-12": 847.74, "2026-10-19": 847.31, "2026-10-26": 847.34, "2026-11-02": 846.0}, "monthly": {"2025-11-01": 935.03, "2025-12-01": 919.35, "2026-01-01": 932.81, "2026-02-01": 919.07, "2026-03-01": 948.49, "2026-04-01": 928.5, "2026-05-01": 938.31, "2026-06-01": 952.05, "2026-07-01": 886.78, "2026-08-01": 860.06, "2026-09-01": 858.31, "2026-10-01": 847.34, "2026-11-01": 846.0}, "inflections": [{"date": "2026-08-03", "value": 910.86, "change_pct": 2.72}, {"date": "2026-01-02", "value": 896.14, "change_pct": -2.52}, {"date": "2026-01-05", "value": 917.51, "change_pct": 2.38}, {"date": "2025-12-26", "value": 926.67, "change_pct": -2.13}, {"date": "2026-09-04", "value": 870.78, "change_pct": 1.88}]}, "US10Y": {"group": "기타", "color": "#7B3A8C", "daily": {"2025-11-03": 4.106, "2025-11-04": 4.089, "2025-11-05": 4.157, "2025-11-06": 4.093, "2025-11-07": 4.093, "2025-11-10": 4.11, "2025-11-11": 4.12, "2025-11-12": 4.065, "2025-11-13": 4.112, "2025-11-14": 4.148, "2025-11-17": 4.133, "2025-11-18": 4.123, "2025-11-19": 4.133, "2025-11-20": 4.106, "2025-11-21": 4.063, "2025-11-24": 4.038, "2025-11-25": 4.002, "2025-11-26": 3.998, "2025-11-28": 4.017, "2025-12-01": 4.096, "2025-12-02": 4.086, "2025-12-03": 4.057, "2025-12-04": 4.108, "2025-12-05": 4.139, "2025-12-08": 4.172, "2025-12-09": 4.186, "2025-12-10": 4.164, "2025-12-11": 4.141, "2025-12-12": 4.194, "2025-12-15": 4.182, "2025-12-16": 4.149, "2025-12-17": 4.151, "2025-12-18": 4.116, "2025-12-19": 4.151, "2025-12-22": 4.169, "2025-12-23": 4.169, "2025-12-24": 4.136, "2025-12-26": 4.136, "2025-12-29": 4.116, "2025-12-30": 4.13, "2025-12-31": 4.163, "2026-01-02": 4.187, "2026-01-05": 4.165, "2026-01-06": 4.179, "2026-01-07": 4.138, "2026-01-08": 4.183, "2026-01-09": 4.171, "2026-01-12": 4.187, "2026-01-13": 4.171, "2026-01-14": 4.14, "2026-01-15": 4.16, "2026-01-16": 4.231, "2026-01-20": 4.295, "2026-01-21": 4.253, "2026-01-22": 4.249, "2026-01-23": 4.239, "2026-01-26": 4.213, "2026-01-27": 4.223, "2026-01-28": 4.251, "2026-01-29": 4.227, "2026-01-30": 4.241, "2026-02-02": 4.275, "2026-02-03": 4.274, "2026-02-04": 4.275, "2026-02-05": 4.21, "2026-02-06": 4.206, "2026-02-09": 4.198, "2026-02-10": 4.147, "2026-02-11": 4.172, "2026-02-12": 4.104, "2026-02-13": 4.056, "2026-02-17": 4.052, "2026-02-18": 4.079, "2026-02-19": 4.075, "2026-02-20": 4.086, "2026-02-23": 4.029, "2026-02-24": 4.033, "2026-02-25": 4.048, "2026-02-26": 4.017, "2026-02-27": 3.962, "2026-03-02": 4.048, "2026-03-03": 4.056, "2026-03-04": 4.08, "2026-03-05": 4.146, "2026-03-06": 4.133, "2026-03-09": 4.136, "2026-03-10": 4.136, "2026-03-11": 4.208, "2026-03-12": 4.273, "2026-03-13": 4.285, "2026-03-16": 4.22, "2026-03-17": 4.202, "2026-03-18": 4.259, "2026-03-19": 4.281, "2026-03-20": 4.391, "2026-03-23": 4.334, "2026-03-24": 4.392, "2026-03-25": 4.328, "2026-03-26": 4.416, "2026-03-27": 4.44, "2026-03-30": 4.342, "2026-03-31": 4.311, "2026-04-01": 4.319, "2026-04-02": 4.313, "2026-04-06": 4.335, "2026-04-07": 4.343, "2026-04-08": 4.291, "2026-04-09": 4.293, "2026-04-10": 4.317, "2026-04-13": 4.297, "2026-04-14": 4.256, "2026-04-15": 4.282, "2026-04-16": 4.309, "2026-04-17": 4.246, "2026-04-20": 4.25, "2026-04-21": 4.292, "2026-04-22": 4.294, "2026-04-23": 4.323, "2026-04-24": 4.31, "2026-04-27": 4.336, "2026-04-28": 4.354, "2026-04-29": 4.418, "2026-04-30": 4.39, "2026-05-01": 4.378, "2026-05-04": 4.446, "2026-05-05": 4.416, "2026-05-06": 4.356, "2026-05-07": 4.392, "2026-05-08": 4.364, "2026-05-11": 4.41, "2026-05-12": 4.463, "2026-05-13": 4.481, "2026-05-14": 4.461, "2026-05-15": 4.595, "2026-05-18": 4.623, "2026-05-19": 4.667, "2026-05-20": 4.572, "2026-05-21": 4.586, "2026-05-22": 4.558, "2026-05-26": 4.493, "2026-05-27": 4.481, "2026-05-28": 4.455, "2026-05-29": 4.453, "2026-06-01": 4.475, "2026-06-02": 4.455, "2026-06-03": 4.491, "2026-06-04": 4.477, "2026-06-05": 4.536, "2026-06-08": 4.552, "2026-06-09": 4.528, "2026-06-10": 4.542, "2026-06-11": 4.463, "2026-06-12": 4.487, "2026-06-15": 4.469, "2026-06-16": 4.428, "2026-06-17": 4.463, "2026-06-18": 4.451, "2026-06-22": 4.509, "2026-06-23": 4.493, "2026-06-24": 4.402, "2026-06-25": 4.392, "2026-06-26": 4.372, "2026-06-29": 4.374, "2026-06-30": 4.418, "2026-07-01": 4.475, "2026-07-02": 4.485, "2026-07-06": 4.479, "2026-07-07": 4.529, "2026-07-08": 4.569, "2026-07-09": 4.539, "2026-07-10": 4.569, "2026-07-13": 4.609, "2026-07-14": 4.585, "2026-07-15": 4.545, "2026-07-16": 4.569, "2026-07-17": 4.541, "2026-07-20": 4.598, "2026-07-21": 4.628, "2026-07-22": 4.657, "2026-07-23": 4.703, "2026-07-24": 4.679, "2026-07-27": 4.641, "2026-07-28": 4.604, "2026-07-29": 4.622, "2026-07-30": 4.663, "2026-07-31": 4.745, "2026-08-03": 4.686, "2026-08-04": 4.627, "2026-08-05": 4.617, "2026-08-06": 4.67, "2026-08-07": 4.66, "2026-08-10": 4.699, "2026-08-11": 4.684, "2026-08-12": 4.682, "2026-08-13": 4.641, "2026-08-14": 4.696, "2026-08-17": 4.724, "2026-08-18": 4.706, "2026-08-19": 4.653, "2026-08-20": 4.696, "2026-08-21": 4.738, "2026-08-24": 4.704, "2026-08-25": 4.639, "2026-08-26": 4.664, "2026-08-27": 4.672, "2026-08-28": 4.72, "2026-08-31": 4.758, "2026-09-01": 4.796, "2026-09-02": 4.796, "2026-09-03": 4.762, "2026-09-04": 4.784, "2026-09-08": 4.806, "2026-09-09": 4.837, "2026-09-10": 4.944, "2026-09-11": 4.975, "2026-09-14": 4.961, "2026-09-15": 4.996, "2026-09-16": 5.006, "2026-09-17": 4.947, "2026-09-18": 4.998, "2026-09-21": 4.963, "2026-09-22": 4.968, "2026-09-23": 5.114, "2026-09-24": 5.162, "2026-09-25": 5.184, "2026-09-28": 5.24, "2026-09-29": 5.255, "2026-09-30": 5.293, "2026-10-01": 5.237, "2026-10-02": 5.277, "2026-10-05": 5.311, "2026-10-06": 5.269, "2026-10-07": 5.277, "2026-10-08": 5.231, "2026-10-09": 5.244, "2026-10-12": 5.24, "2026-10-13": 5.217, "2026-10-14": 5.19, "2026-10-15": 5.089, "2026-10-16": 5.098, "2026-10-19": 5.136, "2026-10-20": 5.117, "2026-10-21": 5.146, "2026-10-22": 4.953, "2026-10-23": 4.988, "2026-10-26": 4.986, "2026-10-27": 4.993, "2026-10-28": 5.045, "2026-10-29": 4.989, "2026-10-30": 4.929, "2026-11-02": 4.894}, "weekly": {"2025-11-03": 4.093, "2025-11-10": 4.148, "2025-11-17": 4.063, "2025-11-24": 4.017, "2025-12-01": 4.139, "2025-12-08": 4.194, "2025-12-15": 4.151, "2025-12-22": 4.136, "2025-12-29": 4.187, "2026-01-05": 4.171, "2026-01-12": 4.231, "2026-01-19": 4.239, "2026-01-26": 4.241, "2026-02-02": 4.206, "2026-02-09": 4.056, "2026-02-16": 4.086, "2026-02-23": 3.962, "2026-03-02": 4.133, "2026-03-09": 4.285, "2026-03-16": 4.391, "2026-03-23": 4.44, "2026-03-30": 4.313, "2026-04-06": 4.317, "2026-04-13": 4.246, "2026-04-20": 4.31, "2026-04-27": 4.378, "2026-05-04": 4.364, "2026-05-11": 4.595, "2026-05-18": 4.558, "2026-05-25": 4.453, "2026-06-01": 4.536, "2026-06-08": 4.487, "2026-06-15": 4.451, "2026-06-22": 4.372, "2026-06-29": 4.485, "2026-07-06": 4.569, "2026-07-13": 4.541, "2026-07-20": 4.679, "2026-07-27": 4.745, "2026-08-03": 4.66, "2026-08-10": 4.696, "2026-08-17": 4.738, "2026-08-24": 4.72, "2026-08-31": 4.784, "2026-09-07": 4.975, "2026-09-14": 4.998, "2026-09-21": 5.184, "2026-09-28": 5.277, "2026-10-05": 5.244, "2026-10-12": 5.098, "2026-10-19": 4.988, "2026-10-26": 4.929, "2026-11-02": 4.894}, "monthly": {"2025-11-01": 4.017, "2025-12-01": 4.163, "2026-01-01": 4.241, "2026-02-01": 3.962, "2026-03-01": 4.311, "2026-04-01": 4.39, "2026-05-01": 4.453, "2026-06-01": 4.418, "2026-07-01": 4.745, "2026-08-01": 4.758, "2026-09-01": 5.293, "2026-10-01": 4.929, "2026-11-01": 4.894}, "inflections": [{"date": "2026-10-22", "value": 4.953, "change_pct": -3.75}, {"date": "2026-05-15", "value": 4.595, "change_pct": 3.0}, {"date": "2026-09-23", "value": 5.114, "change_pct": 2.94}, {"date": "2026-03-20", "value": 4.391, "change_pct": 2.57}, {"date": "2026-03-30", "value": 4.342, "change_pct": -2.21}]}};
+
+/* ═══════════════════════════════════════════
+   상태
+   ═══════════════════════════════════════════ */
+let chart = null;           // Chart.js 인스턴스
+let selected = null;        // 현재 선택된 지표명
+let period = 'daily';       // daily | weekly | monthly
+
+/* ── CSS 변수 값을 읽어오는 헬퍼 (다크모드 대응) ── */
+function token(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+/* ── 숫자 포맷 (크기에 따라 소수점 자동 조정) ── */
+function fmt(v) {
+    const a = Math.abs(v);
+    if (a >= 100) return v.toLocaleString('ko-KR', {maximumFractionDigits: 0});
+    if (a >= 10)  return v.toLocaleString('ko-KR', {minimumFractionDigits: 1, maximumFractionDigits: 1});
+    return v.toLocaleString('ko-KR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+/* ═══════════════════════════════════════════
+   스파크라인 — 레일 각 행에 월별 추세를 그립니다
+   ═══════════════════════════════════════════ */
+function drawSparklines() {
+    document.querySelectorAll('.rail-spark').forEach(svg => {
+        const name = svg.dataset.spark;
+        const info = DATA[name];
+        if (!info) return;
+
+        // 월별 데이터로 간결한 추세선 생성
+        const vals = Object.keys(info.monthly).sort().map(d => info.monthly[d]);
+        if (vals.length < 2) return;
+
+        const min = Math.min(...vals);
+        const max = Math.max(...vals);
+        const range = (max - min) || 1;
+
+        // viewBox 64×20 안에 맞춰 좌표 변환 (상하 2px 여백)
+        const pts = vals.map((v, i) => {
+            const x = (i / (vals.length - 1)) * 64;
+            const y = 18 - ((v - min) / range) * 16;
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+        });
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M' + pts.join('L'));
+        svg.appendChild(path);
+
+        // 지표 고유 색상을 currentColor로 전달 (선택 시 CSS가 흰색으로 덮어씀)
+        svg.style.color = info.color;
+    });
+}
+
+/* ═══════════════════════════════════════════
+   메인 차트 렌더링
+   ═══════════════════════════════════════════ */
+function render(name) {
+    const info = DATA[name];
+    if (!info) return;
+    selected = name;
+
+    const raw = info[period];
+    const dates = Object.keys(raw).sort();
+    const values = dates.map(d => raw[d]);
+
+    /* ── 수치 리드아웃 업데이트 ── */
+    const daily = info.daily;
+    const dDates = Object.keys(daily).sort();
+    const cur = daily[dDates[dDates.length - 1]];
+    const prev = daily[dDates[dDates.length - 2]];
+    const pct = prev ? ((cur - prev) / prev * 100) : 0;
+    const dir = pct >= 0 ? 'up' : 'down';
+
+    document.getElementById('ro-label').textContent = name;
+    document.getElementById('ro-cat').textContent = info.group;
+    document.getElementById('ro-dot').style.background = info.color;
+    document.getElementById('ro-value').textContent = fmt(cur);
+    const chEl = document.getElementById('ro-change');
+    chEl.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+    chEl.className = 'readout-change ' + dir;
+
+    /* ── 변곡점 목록 (일별일 때만 차트에 점 표시) ── */
+    const inflections = info.inflections || [];
+    const listEl = document.getElementById('inflection-list');
+    listEl.innerHTML = inflections.map(pt => {
+        const d = pt.change_pct >= 0 ? 'up' : 'down';
+        const sign = pt.change_pct >= 0 ? '+' : '';
+        const reason = pt.reason
+            ? `<span class="inflection-reason">${pt.reason}</span>`
+            : `<span class="inflection-reason pending">분석 데이터 없음</span>`;
+        return `<div class="inflection-row">
+            <span class="inflection-date">${pt.date}</span>
+            <span class="inflection-pct ${d}">${sign}${pt.change_pct}%</span>
+            ${reason}
+        </div>`;
+    }).join('');
+
+    /* ── 차트 다시 그리기 ── */
+    if (chart) chart.destroy();
+
+    const color = info.color;
+    const inkFaint = token('--ink-faint');
+    const line = token('--line');
+    const surface = token('--surface');
+    const ink = token('--ink');
+
+    // 선 아래 그라디언트 영역
+    const ctx = document.getElementById('chart').getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 320);
+    grad.addColorStop(0, color + '26');
+    grad.addColorStop(1, color + '00');
+
+    // 변곡점을 별도 scatter 데이터셋으로 추가 (일별에서만)
+    const datasets = [{
+        label: name,
+        data: dates.map((d, i) => ({ x: d, y: values[i] })),
+        borderColor: color,
+        backgroundColor: grad,
+        borderWidth: 1.75,
+        pointRadius: 0,
+        pointHitRadius: 12,
+        tension: 0.25,
+        fill: true,
+        order: 2,
+    }];
+
+    if (period === 'daily' && inflections.length) {
+        datasets.push({
+            label: '변곡점',
+            data: inflections.map(pt => ({
+                x: pt.date, y: pt.value,
+                reason: pt.reason || null,
+                pct: pt.change_pct,
+            })),
+            showLine: false,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointBackgroundColor: inflections.map(
+                pt => pt.change_pct >= 0 ? token('--up') : token('--down')),
+            pointBorderColor: surface,
+            pointBorderWidth: 2,
+            order: 1,
+        });
+    }
+
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: { datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 250 },
+            interaction: { mode: 'nearest', axis: 'x', intersect: false },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: ink,
+                    titleColor: surface,
+                    bodyColor: surface,
+                    padding: 10,
+                    cornerRadius: 6,
+                    displayColors: false,
+                    titleFont: { size: 11, family: "'IBM Plex Mono', monospace", weight: '400' },
+                    bodyFont: { size: 13, family: "'IBM Plex Mono', monospace", weight: '500' },
+                    callbacks: {
+                        label: function(c) {
+                            // 변곡점 데이터셋이면 원인을 함께 표시
+                            if (c.datasetIndex === 1) {
+                                const r = c.raw;
+                                const s = r.pct >= 0 ? '+' : '';
+                                return r.reason
+                                    ? [`${s}${r.pct}%`, r.reason]
+                                    : `${s}${r.pct}%`;
+                            }
+                            return fmt(c.parsed.y);
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        unit: period === 'monthly' ? 'month' : period === 'weekly' ? 'week' : 'day',
+                        displayFormats: { day: 'M/d', week: 'M/d', month: "yy'.'MM" },
+                    },
+                    border: { display: false },
+                    grid: { display: false },
+                    ticks: {
+                        color: inkFaint,
+                        font: { size: 10, family: "'IBM Plex Mono', monospace" },
+                        maxTicksLimit: 8,
+                        maxRotation: 0,
+                    },
+                },
+                y: {
+                    position: 'right',
+                    border: { display: false },
+                    grid: { color: line, drawTicks: false },
+                    ticks: {
+                        color: inkFaint,
+                        font: { size: 10, family: "'IBM Plex Mono', monospace" },
+                        maxTicksLimit: 6,
+                        padding: 8,
+                        callback: v => {
+                            if (Math.abs(v) >= 1000000) return (v / 1000000).toFixed(1) + 'M';
+                            if (Math.abs(v) >= 10000) return (v / 1000).toFixed(0) + 'k';
+                            return v.toLocaleString();
+                        },
+                    },
+                },
+            },
+        },
+    });
+}
+
+/* ═══════════════════════════════════════════
+   이벤트 바인딩
+   ═══════════════════════════════════════════ */
+
+// 지표 선택
+document.querySelectorAll('.rail-row').forEach(row => {
+    row.addEventListener('click', () => {
+        document.querySelectorAll('.rail-row').forEach(r => r.classList.remove('is-selected'));
+        row.classList.add('is-selected');
+        render(row.dataset.name);
+    });
+});
+
+// 기간 전환
+document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+        period = btn.dataset.period;
+        if (selected) render(selected);
+    });
+});
+
+// 지표 검색 필터 — 입력에 맞는 행만 남기고, 빈 섹션은 숨깁니다
+document.getElementById('rail-search').addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+
+    document.querySelectorAll('.rail-section').forEach(section => {
+        let visible = 0;
+        section.querySelectorAll('.rail-row').forEach(row => {
+            const match = !q || row.dataset.name.toLowerCase().includes(q);
+            row.hidden = !match;
+            if (match) visible++;
+        });
+        // 해당 섹션에 보이는 행이 하나도 없으면 섹션 제목까지 숨김
+        section.hidden = (visible === 0);
+    });
+});
+
+// 뉴스 카테고리 탭 전환
+document.querySelectorAll('.news-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.news-tab').forEach(t => {
+            t.classList.remove('is-active');
+            t.setAttribute('aria-selected', 'false');
+        });
+        tab.classList.add('is-active');
+        tab.setAttribute('aria-selected', 'true');
+
+        document.querySelectorAll('.news-panel').forEach(p => p.hidden = true);
+        const panel = document.getElementById(tab.dataset.cat);
+        if (panel) panel.hidden = false;
+    });
+});
+
+// 다크모드 전환 시 차트 색상 갱신
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (selected) render(selected);
+});
+
+/* ═══════════════════════════════════════════
+   초기 실행
+   ═══════════════════════════════════════════ */
+drawSparklines();
+const first = Object.keys(DATA)[0];
+if (first) render(first);
+</script>
+</body>
+</html>
